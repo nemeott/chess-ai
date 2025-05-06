@@ -13,7 +13,9 @@ def print_score_details(score, label=""):
     print(f"  Midgame: {score.mg}")
     print(f"  Endgame: {score.eg}")
     print(f"  Non-pawn material: {score.npm}")
-    
+    print(f"  Pawn structure: {score.pawn_struct}")
+    print(f"  King safety: {score.king_safety}")
+
     # Calculate final evaluation using the same formula as evaluate_position
     phase = min(score.npm // NPM_SCALAR, 256)
     interpolated_score = ((score.mg * phase) + (score.eg * (256 - phase))) >> 8
@@ -30,105 +32,118 @@ def highlight_diff(value):
 def test_position(fen, move_uci=None):
     """Test a position with both initialize and update methods."""
     board = chess.Board(fen)
-    
+
     print(f"Testing position: {fen}")
     if move_uci:
         print(f"Move to test: {move_uci}")
     print()
-    
+
     # Initialize from scratch
-    init_score = Score(0, 0, 0, 0)
+    init_score = Score(0, 0, 0, 0, 0, 0)
     init_score.initialize_scores(board)
     print_score_details(init_score, "Initialized")
-    
+
     # If a move is provided, test updating
     if move_uci:
         # Create a copy of the score for updating
-        update_score = Score(init_score.material, init_score.mg, init_score.eg, init_score.npm)
-        
+        update_score = Score(init_score.material, init_score.mg, init_score.eg, init_score.npm, init_score.pawn_struct, init_score.king_safety)
+
         # Make the move and update the score
         move = chess.Move.from_uci(move_uci)
-        update_score.update(board, move)
+        update_score = update_score.updated(board, move)
         board.push(move)
-        
+
         # Print the updated score
         print_score_details(update_score, "After Update")
-        
+
         # Initialize a fresh score for the resulting position
-        fresh_score = Score(0, 0, 0, 0)
+        fresh_score = Score(0, 0, 0, 0, 0, 0)
         fresh_score.initialize_scores(board)
         print_score_details(fresh_score, "Fresh Initialization of New Position")
-        
+
         # Compare the scores
         material_diff = update_score.material - fresh_score.material
         mg_diff = update_score.mg - fresh_score.mg
         eg_diff = update_score.eg - fresh_score.eg
         npm_diff = update_score.npm - fresh_score.npm
+        pawn_struct_diff = update_score.pawn_struct - fresh_score.pawn_struct
+        king_safety_diff = update_score.king_safety - fresh_score.king_safety
 
-        assert(material_diff == 0)
-        assert(mg_diff == 0)
-        assert(eg_diff == 0)
-        assert(npm_diff == 0)
-        
         print("Differences (Update - Fresh Init):")
         print(f"  Material: {highlight_diff(material_diff)}")
         print(f"  Midgame: {highlight_diff(mg_diff)}")
         print(f"  Endgame: {highlight_diff(eg_diff)}")
         print(f"  Non-pawn material: {highlight_diff(npm_diff)}")
+        print(f"  Pawn structure: {highlight_diff(pawn_struct_diff)}")
+        print(f"  King safety: {highlight_diff(king_safety_diff)}")
+
         print()
-    
+
+        assert(material_diff == 0)
+        assert(mg_diff == 0)
+        assert(eg_diff == 0)
+        assert(npm_diff == 0)
+        assert(pawn_struct_diff == 0)
+        assert(king_safety_diff == 0)
+
     print("-" * 80)
     return board
 
 def test_sequence(fens, moves):
     """Test a sequence of moves, tracking score changes."""
     print("=== TESTING COMPLETE SEQUENCE ===")
-    
+
     # Initialize from the first position
     board = chess.Board(fens[0])
-    score = Score(0, 0, 0, 0)
+    score = Score(0, 0, 0, 0, 0, 0)
     score.initialize_scores(board)
-    
+
     print(f"Starting position: {fens[0]}")
     print_score_details(score, "Initial")
-    
+
     # Apply each move and track score changes
     for i, move_uci in enumerate(moves):
         move = chess.Move.from_uci(move_uci)
-        
+
         # Store original values before update
-        original_values = (score.material, score.mg, score.eg, score.npm)
-        
+        original_values = (score.material, score.mg, score.eg, score.npm, score.pawn_struct, score.king_safety)
+
         # Update score and make move
-        score.update(board, move)
+        score = score.updated(board, move)
         board.push(move)
-        
+
         print(f"After move {i+1}: {move_uci}")
         print(f"Position: {board.fen()}")
         print_score_details(score, f"Move {i+1}")
-        
+
         # Compare with fresh initialization
-        fresh = Score(0, 0, 0, 0)
+        fresh = Score(0, 0, 0, 0, 0, 0)
         fresh.initialize_scores(board)
         print_score_details(fresh, f"Fresh score after move {i+1}")
-        
+
         # Compare scores
         material_diff = score.material - fresh.material
         mg_diff = score.mg - fresh.mg
         eg_diff = score.eg - fresh.eg
         npm_diff = score.npm - fresh.npm
+        pawn_struct_diff = score.pawn_struct - fresh.pawn_struct
+        king_safety_diff = score.king_safety - fresh.king_safety
 
-        assert(material_diff == 0)
-        assert(mg_diff == 0)
-        assert(eg_diff == 0)
-        assert(npm_diff == 0)
-        
         print(f"Differences after move {i+1} (Update - Fresh Init):")
         print(f"  Material: {highlight_diff(material_diff)}")
         print(f"  Midgame: {highlight_diff(mg_diff)}")
         print(f"  Endgame: {highlight_diff(eg_diff)}")
         print(f"  Non-pawn material: {highlight_diff(npm_diff)}")
+        print(f"  Pawn structure: {highlight_diff(pawn_struct_diff)}")
+        print(f"  King safety: {highlight_diff(king_safety_diff)}")
         print("-" * 80)
+
+        assert(material_diff == 0)
+        assert(mg_diff == 0)
+        assert(eg_diff == 0)
+        assert(npm_diff == 0)
+        assert(pawn_struct_diff == 0)
+        assert(king_safety_diff == 0)
 
 if __name__ == "__main__":
     # Test individual positions from your game
@@ -147,6 +162,8 @@ if __name__ == "__main__":
     board3 = test_position(fen3, "f1h3")  # Queen captures bishop
 
     # Position 4: Black to move
+    # Black iso -> not iso
+    # Black doubled -> not doubled
     fen4 = "r3r1k1/ppN2qbp/6p1/3p4/5B2/3p2PQ/PPPK1p1P/R6B b - - 0 26"
     board4 = test_position(fen4, "d3c2")  # Pawn moves to c2
 

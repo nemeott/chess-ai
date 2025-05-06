@@ -38,14 +38,14 @@ class TTEntry:
 # Score class to initialize and update scores
 @dataclass
 class Score: # Positive values favor white, negative values favor black
-    __slots__ = ["material", "mg", "eg", "npm", "pawn_struct", "king_saftey"] # Optimization for faster lookups
+    __slots__ = ["material", "mg", "eg", "npm", "pawn_struct", "king_safety"] # Optimization for faster lookups
 
     material: np.int16 # Material score
     mg: np.int16 # Midgame score
     eg: np.int16 # Endgame score
     npm: np.uint16 # Non-pawn material (for phase calculation)
     pawn_struct: np.int8 # Pawn structure score TODO check for overflow
-    king_saftey: np.int8 # King saftey score
+    king_safety: np.int8 # King safety score
 
     def initialize_scores(self, board: chess.Board) -> None:
         """
@@ -59,7 +59,7 @@ class Score: # Positive values favor white, negative values favor black
         self.eg = 0
         self.npm = 0
         self.pawn_struct = 0 # TODO check if values update correctly
-        self.king_saftey = 0
+        self.king_safety = 0
 
         white_bishop_count = 0
         black_bishop_count = 0
@@ -108,38 +108,38 @@ class Score: # Positive values favor white, negative values favor black
         # Process both colors at once with direct bitboard manipulation
         white_pawns = board.pieces_mask(chess.PAWN, chess.WHITE)
         black_pawns = board.pieces_mask(chess.PAWN, chess.BLACK)
-        
+
         # Evaluate isolated pawns for both colors in one pass
         for file in range(8):
             # Pawns in this file
             white_pawns_in_file = chess.popcount(white_pawns & file_masks[file])
             black_pawns_in_file = chess.popcount(black_pawns & file_masks[file])
-            
+
             # Calculate adjacent files mask once per iteration
             adjacent_mask = 0
             if file > 0:
                 adjacent_mask |= file_masks[file - 1] # Append left file to mask
             if file < 7:
                 adjacent_mask |= file_masks[file + 1] # Append right file to mask
-            
+
             # Check for isolated pawns (no pawns in adjacent files)
             if white_pawns_in_file > 0 and chess.popcount(white_pawns & adjacent_mask) == 0:
                 self.pawn_struct -= 20  # Isolated white pawn penalty
             if black_pawns_in_file > 0 and chess.popcount(black_pawns & adjacent_mask) == 0:
                 self.pawn_struct += 20  # Isolated black pawn penalty
-                
+
             # Check for doubled pawns
             if white_pawns_in_file > 1:
                 self.pawn_struct -= 10  # Doubled white pawn penalty
             if black_pawns_in_file > 1:
                 self.pawn_struct += 10  # Doubled black pawn penalty
 
-    def updated(self, board: chess.Board, move: chess.Move) -> None:
+    def updated(self, board: chess.Board, move: chess.Move) -> "Score":
         """
         Returns the updated material, midgame, endgame, and non-pawn material scores based on the move.
         Much faster than re-evaluating the entire board, even if only the leaf nodes are re-evaluated.
         """
-        material, mg, eg, npm, pawn_struct, king_saftey = self.material, self.mg, self.eg, self.npm, self.pawn_struct, self.king_saftey
+        material, mg, eg, npm, pawn_struct, king_safety = self.material, self.mg, self.eg, self.npm, self.pawn_struct, self.king_safety
 
         from_square = move.from_square
         to_square = move.to_square
@@ -167,10 +167,10 @@ class Score: # Positive values favor white, negative values favor black
                 rook_from, rook_to = castle_info
                 if piece_color: # Flip rook square for white
                     rook_from, rook_to = flip[rook_from], flip[rook_to]
-                
+
                 mg += color_multiplier * (mg_rook_table[rook_to] - mg_rook_table[rook_from])
                 eg += color_multiplier * (eg_rook_table[rook_to] - eg_rook_table[rook_from])
-                
+
         # Flip squares for white
         new_from_square, new_to_square = from_square, to_square
         if piece_color:
@@ -195,9 +195,40 @@ class Score: # Positive values favor white, negative values favor black
             mg += color_multiplier * (mg_table[new_to_square] - mg_table[new_from_square])
             eg += color_multiplier * (eg_table[new_to_square] - eg_table[new_from_square])
 
+        # Update pawn structure
+        pawns_before = board.pieces_mask(chess.PAWN, piece_color)
+        pawns_after = pawns_before & ~(1 << from_square) # Remove moved pawn from pawns
+        if not promotion_piece_type: # Add pawn to new square
+            pawns_after |= 1 << to_square
+        else: # Remove pawn if promoted
+            pawns_after &= ~(1 << to_square)
+
+        file_masks = chess.BB_FILES
+        file = from_square & 7
+        to_file = to_square & 7
+
+        pawns_in_file_after = chess.popcount(pawns_after & file_masks[file])
+        if pawns_in_file_after == 0: # No pawns in file after move
+            if file == to_file:
+
+            left_pawns = chess.popcount(pawns_after & file_masks[file - 1]) if file > 0 else 0
+            right_pawns = chess.popcount(pawns_after & file_masks[file + 1]) if file < 7 else 0
+
+            # Update isolated pawn penalties
+            if left_pawns == 0 and right_pawns == 0: # Pawn isolated previously
+                pawn_struct += color_multiplier * 20 # Remove penalty
+            elif left_pawns >= 1 and file > 1 and chess.popcount(pawns_after & file_masks[file - 2]) == 0: # Left adj isolated
+                pawn_struct -= color_multiplier * 20 # Add penalty
+            elif right_pawns >= 1 and file < 6 and chess.popcount(pawns_after & file_masks[file + 2]) == 0: # Right adj isolated
+                pawn_struct -= color_multiplier * 20 # Add penalty
+        elif pawns_in_file_after == 1: # 2 pawns in file before
+            pawn_struct += color_multiplier * 10 # Remove doubled pawn penalty
+
         if castling: # Done if castling
-            return Score(material, mg, eg, npm, pawn_struct, king_saftey)
-        
+            return Score(material, mg, eg, npm, pawn_struct, king_safety)
+
+        del pawns_before, pawns_after, file_masks, file, pawns_in_file_after # TODO: Test effectiveness
+
         # Handle captures
         captured_piece_type = board.piece_type_at(to_square)
 
@@ -207,27 +238,29 @@ class Score: # Positive values favor white, negative values favor black
             captured_piece_type = board.piece_type_at(from_square)
 
         if captured_piece_type: # Capture
-            if captured_piece_type == chess.PAWN:
-                # Pawn structure update
-                pawns = board.pieces_mask(chess.PAWN, piece_color) # Get the current color pawn mask
+            if captured_piece_type == chess.PAWN: # Capturing a pawn (update pawn structure)
+                enemy_pawns_before = board.pieces_mask(chess.PAWN, not piece_color)
+                enemy_pawns_after = enemy_pawns_before & ~(1 << to_square) # Remove captured pawn from enemy pawns
+
                 file_masks = chess.BB_FILES
-                file_num = from_square & 7 # Get the file the pawn was in
-                if chess.popcount(pawns & file_masks[file_num]) == 1: # If no pawns will be in file after move
-                    # Check for isolated pawns in adjacent columns
-                    if file_num - 1 > 0: # Check left file
-                        if chess.popcount(pawns & file_masks[file_num - 1]) > 0: # If pawns in the left file, check left of it
-                            if chess.popcount(pawns & file_masks[file_num - 2]) == 0: # Left adj
-                                self.pawn_struct -= color_multiplier * 20  # Isolated pawn penalty
+                file = to_square & 7 # Get the file of the captured pawn
 
-                    if file_num + 1 < 7: # Check right file
-                        if chess.popcount(pawns & file_masks[file_num + 1]) > 0: # If pawns in the right file, check right of it
-                            if chess.popcount(pawns & file_masks[file_num + 2]) == 0:
-                                self.pawn_struct -= color_multiplier * 20  # Isolated pawn penalty
+                pawns_in_file_after = chess.popcount(enemy_pawns_after & file_masks[file])
+                if pawns_in_file_after == 0: # No pawns in file after move
+                    left_pawns = chess.popcount(enemy_pawns_after & file_masks[file - 1]) if file > 0 else 0
+                    right_pawns = chess.popcount(enemy_pawns_after & file_masks[file + 1]) if file < 7 else 0
 
-                    # Check for doubled pawns
-                    to_square_file_num = 
+                    # Update isolated pawn penalties
+                    if left_pawns == 0 and right_pawns == 0: # Pawn isolated previously
+                        pawn_struct += -color_multiplier * 20 # Remove penalty
+                    elif left_pawns >= 1 and file > 1 and chess.popcount(enemy_pawns_after & file_masks[file - 2]) == 0: # Left adj isolated
+                        pawn_struct -= -color_multiplier * 20 # Add penalty
+                    elif right_pawns >= 1 and file < 6 and chess.popcount(enemy_pawns_after & file_masks[file + 2]) == 0: # Right adj isolated
+                        pawn_struct -= -color_multiplier * 20 # Add penalty
+                elif pawns_in_file_after == 1: # 2 pawns in file before
+                    pawn_struct += -color_multiplier * 10 # Remove doubled pawn penalty
 
-            else:
+            else: # Capturing a piece other than a pawn
                 # Update npm score
                 npm -= piece_values[captured_piece_type]
 
@@ -243,7 +276,7 @@ class Score: # Positive values favor white, negative values favor black
             mg -= -color_multiplier * mg_tables[captured_piece_type][to_square]
             eg -= -color_multiplier * eg_tables[captured_piece_type][to_square]
 
-        return Score(material, mg, eg, npm, pawn_struct, king_saftey)
+        return Score(material, mg, eg, npm, pawn_struct, king_safety)
 
 
 class ChessBot:
@@ -300,7 +333,7 @@ class ChessBot:
 
         # Cache tables for faster lookups
         piece_values = PIECE_VALUES_STOCKFISH
-        
+
         color_multiplier = 1 if board.turn else -1
 
         # Sort remaining moves
@@ -409,7 +442,7 @@ class ChessBot:
                     beta = min(beta, best_value) # Get new beta
                     if best_value <= alpha:
                         break  # Alpha cutoff (fail-low: other positions are better)
-        
+
         if best_move is None: # If no legal moves, evaluate position (best move is None if loop did iterate through legal moves)
             return self.evaluate_position(board, score, tt_entry, has_legal_moves=False), None
 
@@ -476,7 +509,7 @@ class ChessBot:
                     ordered_moves = better
             else:
                 beta = seperation_value
-                
+
         return best_value, best_move
 
 
@@ -488,7 +521,7 @@ class ChessBot:
 
         # Run minimax once with manual timing
         start_time = default_timer()
-        
+
         alpha, beta = MIN_VALUE, MAX_VALUE
 
         best_value, best_move = self.alpha_beta(
@@ -500,9 +533,9 @@ class ChessBot:
             self.game.score)
 
         # best_value, best_move = self.best_node_search(board, alpha, beta, board.turn)
-        
+
         print(f"Goal value: {best_value}")
-        
+
         # assert best_move is not None, "No best move returned" # TODO remove when done testing
         if best_move is None:
 
