@@ -38,19 +38,108 @@ class TTEntry:
 # Score class to initialize and update scores
 @dataclass
 class Score: # Positive values favor white, negative values favor black
-    __slots__ = ["material", "mg", "eg", "npm"] # Optimization for faster lookups
+    __slots__ = ["material", "mg", "eg", "npm", "pawn_struct", "king_saftey"] # Optimization for faster lookups
 
     material: np.int16 # Material score
     mg: np.int16 # Midgame score
     eg: np.int16 # Endgame score
     npm: np.uint16 # Non-pawn material (for phase calculation)
+    pawn_struct: np.int8 # Pawn structure score TODO check for overflow
+    king_saftey: np.int8 # King saftey score
+
+    def initialize_scores(self, board: chess.Board) -> None:
+        """
+        Initialize values for starting position (works with custom starting FENs).
+        Calculates material score, npm score, and evaluates piece positions.
+        Evaluates piece positions using PSQT with interpolation between middlegame and endgame.
+        Runs only once so not optimized for clarity.
+        """
+        self.material = 0
+        self.mg = 0
+        self.eg = 0
+        self.npm = 0
+        self.pawn_struct = 0 # TODO check if values update correctly
+        self.king_saftey = 0
+
+        white_bishop_count = 0
+        black_bishop_count = 0
+
+        # Cache tables for faster lookups
+        piece_values = PIECE_VALUES_STOCKFISH
+        mg_tables = PSQT[MIDGAME]
+        eg_tables = PSQT[ENDGAME]
+        flip = FLIP
+        bishop_bonus = BISHOP_PAIR_BONUS
+
+        # Evaluate each piece type
+        for square in chess.SQUARES:
+            piece_type = board.piece_type_at(square)
+            if piece_type:
+                piece_color = board.color_at(square)
+
+                # Update npm score
+                if piece_type != chess.PAWN and piece_type != chess.KING:
+                    self.npm += piece_values[piece_type]
+
+                # Update material and position scores
+                if piece_color: # White piece
+                    self.material += piece_values[piece_type]
+                    self.mg += mg_tables[piece_type][flip[square]]
+                    self.eg += eg_tables[piece_type][flip[square]]
+                    if piece_type == chess.BISHOP:
+                        white_bishop_count += 1
+                else: # Black piece
+                    self.material -= piece_values[piece_type]
+                    self.mg -= mg_tables[piece_type][square]
+                    self.eg -= eg_tables[piece_type][square]
+                    if piece_type == chess.BISHOP:
+                        black_bishop_count += 1
+
+        # Bishop pair bonus worth half a pawn
+        if white_bishop_count >= 2:
+            self.material += bishop_bonus
+        if black_bishop_count >= 2:
+            self.material -= bishop_bonus
+
+
+        # Pawn structure
+        file_masks = chess.BB_FILES
+
+        # Process both colors at once with direct bitboard manipulation
+        white_pawns = board.pieces_mask(chess.PAWN, chess.WHITE)
+        black_pawns = board.pieces_mask(chess.PAWN, chess.BLACK)
+        
+        # Evaluate isolated pawns for both colors in one pass
+        for file in range(8):
+            # Pawns in this file
+            white_pawns_in_file = chess.popcount(white_pawns & file_masks[file])
+            black_pawns_in_file = chess.popcount(black_pawns & file_masks[file])
+            
+            # Calculate adjacent files mask once per iteration
+            adjacent_mask = 0
+            if file > 0:
+                adjacent_mask |= file_masks[file - 1] # Append left file to mask
+            if file < 7:
+                adjacent_mask |= file_masks[file + 1] # Append right file to mask
+            
+            # Check for isolated pawns (no pawns in adjacent files)
+            if white_pawns_in_file > 0 and chess.popcount(white_pawns & adjacent_mask) == 0:
+                self.pawn_struct -= 20  # Isolated white pawn penalty
+            if black_pawns_in_file > 0 and chess.popcount(black_pawns & adjacent_mask) == 0:
+                self.pawn_struct += 20  # Isolated black pawn penalty
+                
+            # Check for doubled pawns
+            if white_pawns_in_file > 1:
+                self.pawn_struct -= 10  # Doubled white pawn penalty
+            if black_pawns_in_file > 1:
+                self.pawn_struct += 10  # Doubled black pawn penalty
 
     def updated(self, board: chess.Board, move: chess.Move) -> None:
         """
         Returns the updated material, midgame, endgame, and non-pawn material scores based on the move.
         Much faster than re-evaluating the entire board, even if only the leaf nodes are re-evaluated.
         """
-        material, mg, eg, npm = self.material, self.mg, self.eg, self.npm
+        material, mg, eg, npm, pawn_struct, king_saftey = self.material, self.mg, self.eg, self.npm, self.pawn_struct, self.king_saftey
 
         from_square = move.from_square
         to_square = move.to_square
@@ -107,7 +196,7 @@ class Score: # Positive values favor white, negative values favor black
             eg += color_multiplier * (eg_table[new_to_square] - eg_table[new_from_square])
 
         if castling: # Done if castling
-            return Score(material, mg, eg, npm)
+            return Score(material, mg, eg, npm, pawn_struct, king_saftey)
         
         # Handle captures
         captured_piece_type = board.piece_type_at(to_square)
@@ -118,7 +207,27 @@ class Score: # Positive values favor white, negative values favor black
             captured_piece_type = board.piece_type_at(from_square)
 
         if captured_piece_type: # Capture
-            if captured_piece_type != chess.PAWN: # and captured_piece_type != chess.KING:
+            if captured_piece_type == chess.PAWN:
+                # Pawn structure update
+                pawns = board.pieces_mask(chess.PAWN, piece_color) # Get the current color pawn mask
+                file_masks = chess.BB_FILES
+                file_num = from_square & 7 # Get the file the pawn was in
+                if chess.popcount(pawns & file_masks[file_num]) == 1: # If no pawns will be in file after move
+                    # Check for isolated pawns in adjacent columns
+                    if file_num - 1 > 0: # Check left file
+                        if chess.popcount(pawns & file_masks[file_num - 1]) > 0: # If pawns in the left file, check left of it
+                            if chess.popcount(pawns & file_masks[file_num - 2]) == 0: # Left adj
+                                self.pawn_struct -= color_multiplier * 20  # Isolated pawn penalty
+
+                    if file_num + 1 < 7: # Check right file
+                        if chess.popcount(pawns & file_masks[file_num + 1]) > 0: # If pawns in the right file, check right of it
+                            if chess.popcount(pawns & file_masks[file_num + 2]) == 0:
+                                self.pawn_struct -= color_multiplier * 20  # Isolated pawn penalty
+
+                    # Check for doubled pawns
+                    to_square_file_num = 
+
+            else:
                 # Update npm score
                 npm -= piece_values[captured_piece_type]
 
@@ -134,59 +243,7 @@ class Score: # Positive values favor white, negative values favor black
             mg -= -color_multiplier * mg_tables[captured_piece_type][to_square]
             eg -= -color_multiplier * eg_tables[captured_piece_type][to_square]
 
-        return Score(material, mg, eg, npm)
-
-    def initialize_scores(self, board: chess.Board) -> None:
-        """
-        Initialize values for starting position (works with custom starting FENs).
-        Calculates material score, npm score, and evaluates piece positions.
-        Evaluates piece positions using PSQT with interpolation between middlegame and endgame.
-        Runs only once so not optimized for clarity.
-        """
-        self.material = 0
-        self.mg = 0
-        self.eg = 0
-        self.npm = 0
-
-        white_bishop_count = 0
-        black_bishop_count = 0
-
-        # Cache tables for faster lookups
-        piece_values = PIECE_VALUES_STOCKFISH
-        mg_tables = PSQT[MIDGAME]
-        eg_tables = PSQT[ENDGAME]
-        flip = FLIP
-        bishop_bonus = BISHOP_PAIR_BONUS
-
-        # Evaluate each piece type
-        for square in chess.SQUARES:
-            piece_type = board.piece_type_at(square)
-            if piece_type:
-                piece_color = board.color_at(square)
-
-                # Update npm score
-                if piece_type != chess.PAWN and piece_type != chess.KING:
-                    self.npm += piece_values[piece_type]
-
-                # Update material and position scores
-                if piece_color: # White piece
-                    self.material += piece_values[piece_type]
-                    self.mg += mg_tables[piece_type][flip[square]]
-                    self.eg += eg_tables[piece_type][flip[square]]
-                    if piece_type == chess.BISHOP:
-                        white_bishop_count += 1
-                else: # Black piece
-                    self.material -= piece_values[piece_type]
-                    self.mg -= mg_tables[piece_type][square]
-                    self.eg -= eg_tables[piece_type][square]
-                    if piece_type == chess.BISHOP:
-                        black_bishop_count += 1
-
-        # Bishop pair bonus worth half a pawn
-        if white_bishop_count >= 2:
-            self.material += bishop_bonus
-        if black_bishop_count >= 2:
-            self.material -= bishop_bonus
+        return Score(material, mg, eg, npm, pawn_struct, king_saftey)
 
 
 class ChessBot:
@@ -293,8 +350,8 @@ class ChessBot:
         original_alpha, original_beta = alpha, beta
 
         # Lookup position in transposition table
-        key = board._transposition_key() # ? Much faster
         # key = zobrist_hash(board) # ! REALLY SLOW (probably because it is not incremental)
+        key = board._transposition_key() # ? Much faster
         tt_entry = self.transposition_table.get(key)
 
         # If position is in transposition table and depth is sufficient
@@ -357,9 +414,9 @@ class ChessBot:
             return self.evaluate_position(board, score, tt_entry, has_legal_moves=False), None
 
         # Store position in transposition table
-        if best_value <= alpha: # TODO compare with original alpha and beta
+        if best_value <= original_alpha: # TODO compare with original alpha and beta
             flag = UPPERBOUND
-        elif best_value >= beta:
+        elif best_value >= original_beta:
             flag = LOWERBOUND
         else:
             flag = EXACT
@@ -369,7 +426,7 @@ class ChessBot:
         return best_value, best_move
 
 
-    # TODO ---------------------------------------------
+    # TODO WIP ---------------------------------------------
     def next_guess(self, alpha, beta, subtree_count):
         return alpha + (beta - alpha) * (subtree_count - 1) / subtree_count
 
@@ -432,16 +489,17 @@ class ChessBot:
         # Run minimax once with manual timing
         start_time = default_timer()
         
-        # best_value, best_move = self.alpha_beta(
-        #     board,
-        #     DEPTH,
-        #     MIN_VALUE,
-        #     MAX_VALUE,
-        #     board.turn,
-        #     self.game.score)
-
         alpha, beta = MIN_VALUE, MAX_VALUE
-        best_value, best_move = self.best_node_search(board, alpha, beta, board.turn)
+
+        best_value, best_move = self.alpha_beta(
+            board,
+            DEPTH,
+            alpha,
+            beta,
+            board.turn,
+            self.game.score)
+
+        # best_value, best_move = self.best_node_search(board, alpha, beta, board.turn)
         
         print(f"Goal value: {best_value}")
         

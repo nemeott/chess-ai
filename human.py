@@ -18,9 +18,9 @@ class HumanPlayer:
             rank_idx = 7 - rank_idx
         return chess.square(file_idx, rank_idx)
 
-    def is_promotion_move(self, board, from_square, to_square):
+    def is_promotion_move(self, board: chess.Board, from_square, to_square):
         """Check if the move would be a pawn promotion."""
-        piece = board.get_board_state().piece_at(from_square)
+        piece = board.piece_at(from_square)
         if piece and piece.piece_type == chess.PAWN:
             rank = chess.square_rank(to_square)
             return (self.color == chess.WHITE and rank == 7) or \
@@ -119,7 +119,7 @@ class HumanPlayer:
                     if button_rect.collidepoint(mouse_pos):
                         return piece_type
         
-    def get_move(self, board):
+    def get_move(self, board: chess.Board):
         """Get move from human player through GUI interaction."""
         # Removed pygame.event.clear() to avoid discarding important events
         
@@ -135,7 +135,7 @@ class HumanPlayer:
                 
                 if self.selected_square is None:
                     # First click - select piece
-                    piece = board.get_board_state().piece_at(square)
+                    piece = board.piece_at(square)
                     if piece and piece.color == self.color:
                         self.selected_square = square
                         # Immediately redraw board with highlighted square
@@ -156,11 +156,14 @@ class HumanPlayer:
                         move = chess.Move(from_square, to_square)
                     
                     # Check if move is legal
-                    if move in board.get_legal_moves():
+                    if move in board.legal_moves:
                         self.selected_square = None
+                        self.game.score = self.game.score.updated(board, move) # Update static eval score
                         return move
                     
                     # If illegal move, clear selection
                     self.selected_square = None
         
+
+
         return None

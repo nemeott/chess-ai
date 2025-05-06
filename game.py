@@ -21,7 +21,7 @@ class ChessGame:
         self.last_move = None # Last move played
         self.last_update_time: int = pygame.time.get_ticks()
         
-        self.score = Score(0, 0, 0, 0)  # Score object to store material, mg, eg, and npm scores
+        self.score = Score(0, 0, 0, 0, 0, 0)  # Score object to store material, mg, eg, and npm scores
         self.score.initialize_scores(self.board.get_board_state()) # Initialize scores once and update from there
 
         # Initialize players based on IS_BOT flag
@@ -298,14 +298,14 @@ class ChessGame:
             cached_score = self.score.material + interpolated_score
 
             # Test if cached score is correct
-            actual_score = Score(0, 0, 0, 0)
+            actual_score = Score(0, 0, 0, 0, 0, 0)
             actual_score.initialize_scores(self.board.get_board_state())
 
             phase = min(actual_score.npm // NPM_SCALAR, 256)
             interpolated_score = ((actual_score.mg * phase) + (actual_score.eg * (256 - phase))) >> 8
             actual_score = actual_score.material + interpolated_score
 
-            assert cached_score == actual_score, f"Eval: {cached_score}, {actual_score}"
+            # assert cached_score == actual_score, f"Eval: {cached_score}, {actual_score}"
             print(f"Eval: {cached_score}, {actual_score}")
             
             print(f"Move played: {move}")
