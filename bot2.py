@@ -35,6 +35,7 @@ class TTEntry:
     flag: Flag
     best_move: Optional[chess.Move]
 
+# TODO: Move to own file
 # Score class to initialize and update scores
 @dataclass
 class Score: # Positive values favor white, negative values favor black
@@ -174,46 +175,83 @@ class Score: # Positive values favor white, negative values favor black
         elif piece_type == chess.PAWN: # Update pawn structure if moving a pawn
             pawns_before = board.pieces_mask(chess.PAWN, piece_color)
             pawns_after = pawns_before & ~(1 << from_square) # Remove moved pawn from pawns
-            if not promotion_piece_type: # Add pawn to new square
-                pawns_after |= 1 << to_square
-            else: # Remove pawn if promoted
-                pawns_after &= ~(1 << to_square)
+            if promotion_piece_type: # If we are promoting, then we need to account for the dissapearance of the pawn
+                file_masks = chess.BB_FILES
+                file = from_square & 7
 
-            file_masks = chess.BB_FILES
-            file = from_square & 7
-            to_file = to_square & 7
+                pawns_in_file_after = chess.popcount(pawns_after & file_masks[file])
 
-            pawns_in_file_after = chess.popcount(pawns_after & file_masks[file])
-            
-            if file != to_file and pawns_in_file_after == 1: # 2 pawns in file before
-                pawn_struct += color_multiplier * 10 # Remove doubled pawn penalty
+                if pawns_in_file_after == 1: # 2 pawns in file before
+                    pawn_struct += color_multiplier * 10 # Remove doubled pawn penalty
+                
+                if pawns_in_file_after == 0:  # No pawns in file after move
+                    left_pawns = chess.popcount(pawns_after & file_masks[file - 1]) if file > 0 else 0
+                    right_pawns = chess.popcount(pawns_after & file_masks[file + 1]) if file < 7 else 0
 
-            # if pawns_in_file_after == 0: # No pawns in file after move
-            if to_file < file: # Move to left file (to_file < file)
-                left_pawns = chess.popcount(pawns_after & file_masks[to_file - 1]) if to_file > 0 else 0
-                # If pawns in file after is 0, don't need to check right pawns
-                right_pawns = chess.popcount(pawns_after & file_masks[file + 1]) if (pawns_in_file_after != 0 and file < 7) else 0
+                    # Check if left file is now isolated
+                    if left_pawns >= 1 and (chess.popcount(pawns_after & file_masks[file - 2]) if file > 1 else 0) == 0:
+                        pawn_struct -= color_multiplier * 20  # Add penalty for isolated left file
+                    # Check if right file is now isolated
+                    if right_pawns >= 1 and (chess.popcount(pawns_after & file_masks[file + 2]) if file < 6 else 0) == 0:
+                        pawn_struct -= color_multiplier * 20  # Add penalty for isolated right file
 
-                if chess.popcount(pawns_after & file_masks[to_file]) == 2: # If now 2 pawns in file
-                    pawn_struct -= color_multiplier * 10 # Add doubled pawn penalty
+            else:  # Not promoting
+                pawns_after |= 1 << to_square # Add moved pawn to pawns
 
-                if left_pawns >= 1 and chess.popcount(pawns_after & file_masks[to_file - 2]) if to_file > 1 else 0 == 0: # Left adj was isolated
-                    pawn_struct += color_multiplier * 20 # Remove penalty
-                if right_pawns >= 1 and chess.popcount(pawns_after & file_masks[file + 2]) if file < 6 else 0 == 0: # Right adj is now isolated
-                    pawn_struct -= color_multiplier * 20 # Add penalty
-                    
-            elif to_file > file: # Move to right file (file < to_file)
-                # If pawns in file after is 0, don't need to check left pawns
-                left_pawns = chess.popcount(pawns_after & file_masks[file - 1]) if (pawns_in_file_after != 0 and file > 0) else 0
-                right_pawns = chess.popcount(pawns_after & file_masks[to_file + 1]) if to_file < 7 else 0
+                file_masks = chess.BB_FILES
+                file = from_square & 7
+                to_file = to_square & 7
 
-                if chess.popcount(pawns_after & file_masks[to_file]) == 2: # If now 2 pawns in file
-                    pawn_struct -= color_multiplier * 10 # Add doubled pawn penalty
+                pawns_in_file_after = chess.popcount(pawns_after & file_masks[file])
 
-                if left_pawns >= 1 and chess.popcount(pawns_after & file_masks[file - 2]) if file > 1 else 0 == 0: # Left adj is now isolated
-                    pawn_struct -= color_multiplier * 20 # Add penalty
-                if right_pawns >= 1 and chess.popcount(pawns_after & file_masks[to_file + 2]) if to_file < 6 else 0 == 0: # Right adj was isolated
-                    pawn_struct += color_multiplier * 20 # Remove penalty
+                if file != to_file and pawns_in_file_after == 1: # 2 pawns in file before
+                    pawn_struct += color_multiplier * 10 # Remove doubled pawn penalty
+
+                if to_file < file: # Move to left file (left, to_file, file, right)
+                    left_pawns = chess.popcount(pawns_after & file_masks[to_file - 1]) if to_file > 0 else 0
+                    pawns_in_to_file = chess.popcount(pawns_after & file_masks[to_file])
+                    # pawns_in_file_after
+                    right_pawns = chess.popcount(pawns_after & file_masks[file + 1]) if file < 7 else 0
+
+                    if file != to_file and pawns_in_to_file == 2: # If now 2 pawns in file
+                        pawn_struct -= color_multiplier * 10 # Add doubled pawn penalty
+
+                    # If no longer isolated because of move (moved left, had no right pawns)
+                    if pawns_in_to_file == 1 and right_pawns == 0:
+                        pawn_struct += color_multiplier * 20 # Remove penalty
+
+                    # Self isolating
+                    if pawns_in_to_file >= 1 and left_pawns == 0 and pawns_in_file_after == 0:
+                        pawn_struct -= color_multiplier * 20 # Add penalty
+
+                    # Left was isolated previously (have left pawns, added a pawn, and no pawns left of left adj)
+                    if left_pawns >= 1 and pawns_in_to_file == 1 and (chess.popcount(pawns_after & file_masks[to_file - 2]) if to_file > 1 else 0) == 0:
+                        pawn_struct += color_multiplier * 20 # Remove penalty
+                    if pawns_in_file_after == 0 and right_pawns >= 1 and (chess.popcount(pawns_after & file_masks[file + 2]) if file < 6 else 0) == 0: # Right adj is now isolated
+                        pawn_struct -= color_multiplier * 20 # Add penalty
+                        
+                elif to_file > file: # Move to right file (left, file, to_file, right)
+                    left_pawns = chess.popcount(pawns_after & file_masks[file - 1]) if file > 0 else 0
+                    # pawns_in_file_after
+                    pawns_in_to_file = chess.popcount(pawns_after & file_masks[to_file])
+                    right_pawns = chess.popcount(pawns_after & file_masks[to_file + 1]) if to_file < 7 else 0
+
+                    if file != to_file and pawns_in_to_file == 2: # If now 2 pawns in file
+                        pawn_struct -= color_multiplier * 10 # Add doubled pawn penalty
+
+                    # If no longer isolated because of move (moved right, had no left pawns)
+                    if pawns_in_to_file == 1 and left_pawns == 0:
+                        pawn_struct += color_multiplier * 20 # Remove penalty
+
+                    # Self isolating
+                    if pawns_in_to_file >= 1 and right_pawns == 0 and pawns_in_file_after == 0:
+                        pawn_struct -= color_multiplier * 20 # Add penalty
+
+                    if pawns_in_file_after == 0 and left_pawns >= 1 and (chess.popcount(pawns_after & file_masks[file - 2]) if file > 1 else 0) == 0: # Left adj is now isolated
+                        pawn_struct -= color_multiplier * 20 # Add penalty
+                    # Right was isolated previously (added a pawn, have right pawns, and no pawns right of right adj)
+                    if right_pawns >= 1 and pawns_in_to_file == 1 and (chess.popcount(pawns_after & file_masks[to_file + 2]) if to_file < 6 else 0) == 0: # Right adj was isolated
+                        pawn_struct += color_multiplier * 20 # Remove penalty
 
 
         # Flip squares for white
@@ -267,9 +305,9 @@ class Score: # Positive values favor white, negative values favor black
                     # Update isolated pawn penalties
                     if left_pawns == 0 and right_pawns == 0: # Pawn isolated previously
                         pawn_struct += -color_multiplier * 20 # Remove penalty
-                    elif left_pawns >= 1 and file > 1 and chess.popcount(enemy_pawns_after & file_masks[file - 2]) == 0: # Left adj isolated
+                    if left_pawns >= 1 and (chess.popcount(enemy_pawns_after & file_masks[file - 2]) if file > 1 else 0) == 0: # Left adj isolated
                         pawn_struct -= -color_multiplier * 20 # Add penalty
-                    elif right_pawns >= 1 and file < 6 and chess.popcount(enemy_pawns_after & file_masks[file + 2]) == 0: # Right adj isolated
+                    if right_pawns >= 1 and (chess.popcount(enemy_pawns_after & file_masks[file + 2]) if file < 6 else 0) == 0: # Right adj isolated
                         pawn_struct -= -color_multiplier * 20 # Add penalty
                 elif pawns_in_file_after == 1: # 2 pawns in file before
                     pawn_struct += -color_multiplier * 10 # Remove doubled pawn penalty

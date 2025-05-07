@@ -89,62 +89,6 @@ def test_position(fen, move_uci=None):
     print("-" * 80)
     return board
 
-def test_sequence(fens, moves):
-    """Test a sequence of moves, tracking score changes."""
-    print("=== TESTING COMPLETE SEQUENCE ===")
-
-    # Initialize from the first position
-    board = chess.Board(fens[0])
-    score = Score(0, 0, 0, 0, 0, 0)
-    score.initialize_scores(board)
-
-    print(f"Starting position: {fens[0]}")
-    print_score_details(score, "Initial")
-
-    # Apply each move and track score changes
-    for i, move_uci in enumerate(moves):
-        move = chess.Move.from_uci(move_uci)
-
-        # Store original values before update
-        original_values = (score.material, score.mg, score.eg, score.npm, score.pawn_struct, score.king_safety)
-
-        # Update score and make move
-        score = score.updated(board, move)
-        board.push(move)
-
-        print(f"After move {i+1}: {move_uci}")
-        print(f"Position: {board.fen()}")
-        print_score_details(score, f"Move {i+1}")
-
-        # Compare with fresh initialization
-        fresh = Score(0, 0, 0, 0, 0, 0)
-        fresh.initialize_scores(board)
-        print_score_details(fresh, f"Fresh score after move {i+1}")
-
-        # Compare scores
-        material_diff = score.material - fresh.material
-        mg_diff = score.mg - fresh.mg
-        eg_diff = score.eg - fresh.eg
-        npm_diff = score.npm - fresh.npm
-        pawn_struct_diff = score.pawn_struct - fresh.pawn_struct
-        king_safety_diff = score.king_safety - fresh.king_safety
-
-        print(f"Differences after move {i+1} (Update - Fresh Init):")
-        print(f"  Material: {highlight_diff(material_diff)}")
-        print(f"  Midgame: {highlight_diff(mg_diff)}")
-        print(f"  Endgame: {highlight_diff(eg_diff)}")
-        print(f"  Non-pawn material: {highlight_diff(npm_diff)}")
-        print(f"  Pawn structure: {highlight_diff(pawn_struct_diff)}")
-        print(f"  King safety: {highlight_diff(king_safety_diff)}")
-        print("-" * 80)
-
-        assert(material_diff == 0)
-        assert(mg_diff == 0)
-        assert(eg_diff == 0)
-        assert(npm_diff == 0)
-        assert(pawn_struct_diff == 0)
-        assert(king_safety_diff == 0)
-
 if __name__ == "__main__":
     # Test individual positions from your game
     print("=== TESTING INDIVIDUAL POSITIONS ===")
@@ -171,22 +115,14 @@ if __name__ == "__main__":
     fen5 = "r3r1k1/ppN2qbp/6p1/3p4/5B2/6PQ/PPpK1p1P/R6B w - - 0 27"
     board5 = test_position(fen5, "c7a8")  # Knight captures rook
 
-    # Test the complete sequence
-    fens = [
-        "r1b1r1k1/ppp2qbp/6p1/1N1p4/5B2/3p2P1/PPPK1p1P/R4Q1B w - - 0 25",
-        "r1b1r1k1/ppN2qbp/6p1/3p4/5B2/3p2P1/PPPK1p1P/R4Q1B b - - 0 25",
-        "r3r1k1/ppN2qbp/6p1/3p4/5B2/3p2Pb/PPPK1p1P/R4Q1B w - - 1 26",
-        "r3r1k1/ppN2qbp/6p1/3p4/5B2/3p2PQ/PPPK1p1P/R6B b - - 0 26",
-        "r3r1k1/ppN2qbp/6p1/3p4/5B2/6PQ/PPpK1p1P/R6B w - - 0 27",
-        "R3r1k1/pp3qbp/6p1/3p4/5B2/6PQ/PPpK1p1P/R6B b - - 0 27"
-    ]
+    # Position 6
+    fen6 = "r1bqkb1r/ppp1pppp/2n2n2/3p4/3P4/2N2N2/PPP1PPPP/R1BQKB1R w KQkq - 2 4"
+    board6 = test_position(fen6, "c3d5")  # Pawn captures pawn
 
-    moves = [
-        "b5c7",  # Knight captures pawn
-        "c8h3",  # Bishop moves to h3
-        "f1h3",  # Queen captures bishop
-        "d3c2",  # Pawn moves to c2
-        "c7a8"   # Knight captures rook
-    ]
+    # Position 7: Test promoting a pawn
+    fen7 = "8/1pp2p1P/8/1K6/8/5kP1/8/2r5 w - - 1 29"
+    board7 = test_position(fen7, "h7h8q")  # Pawn promotes to queen
 
-    test_sequence(fens, moves)
+    # Position 8: Self isolation (covid pawn)
+    fen8 = "r1bq1rk1/pp3ppp/2p2n2/4n1N1/1b1p4/4p1N1/PPP1BPPP/R1BQ2KR w - - 0 12"
+    board8 = test_position(fen8, "f2e3")  # Pawn takes pawn
