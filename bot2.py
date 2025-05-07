@@ -48,6 +48,19 @@ class Score: # Positive values favor white, negative values favor black
     pawn_struct: np.int8 # Pawn structure score TODO check for overflow
     king_safety: np.int8 # King safety score
 
+    def calculate(self) -> int:
+        """
+        Calculate the score for the current position.
+        Uses the phase to interpolate between midgame and endgame scores.
+        Also uses the phase to weight the pawn structure score (more important in endgame).
+        Adds the material score, interpolated mg/eg score, and interpolated pawn structure score.
+        """
+        phase = min(self.npm // NPM_SCALAR, 256) # Phase value between 0 and 256 (0 = endgame, 256 = opening)
+        # assert 0 <= phase <= 256, f"Phase value out of bounds: {phase}"
+        interpolated_mg_eg_score: int = ((int(self.mg) * phase) + (int(self.eg) * (256 - phase))) >> 8 # Int division by 256
+        interpolated_pawn_struct: int = (int(self.pawn_struct) * (256 - phase)) >> 8 # Int division by 256
+        return self.material + interpolated_mg_eg_score + interpolated_pawn_struct
+
     def initialize_scores(self, board: chess.Board) -> None:
         """
         Initialize values for starting position (works with custom starting FENs).
@@ -369,12 +382,7 @@ class ChessBot:
         elif board.can_claim_fifty_moves(): # Avoid fifty move rule
             return 0
 
-        # Return score (material + interpolated mg/eg score)
-        phase = min(score.npm // NPM_SCALAR, 256) # Phase value between 0 and 256 (0 = endgame, 256 = opening)
-        assert 0 <= phase <= 256, f"Phase value out of bounds: {phase}" # TODO remove when done testing
-        interpolated_score = ((int(score.mg) * phase) + (int(score.eg) * (256 - phase))) >> 8 # Int division by 256
-        interpolated_pawn_struct = (int(score.pawn_struct) * (256 - phase)) >> 8 # Int division by 256
-        return score.material + interpolated_score + interpolated_pawn_struct
+        return score.calculate()
 
     # def quiescence(self, board: chess.Board, alpha, beta, depth):
 

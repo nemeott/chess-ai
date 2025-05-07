@@ -6,7 +6,7 @@ from bot2 import Score, MIDGAME, ENDGAME, PSQT, PIECE_VALUES_STOCKFISH, FLIP, NP
 RED = "\033[91m"
 RESET = "\033[0m"
 
-def print_score_details(score, label=""):
+def print_score_details(score: Score, label=""):
     """Print detailed score information."""
     print(f"{label} Score Details:")
     print(f"  Material: {score.material}")
@@ -16,11 +16,7 @@ def print_score_details(score, label=""):
     print(f"  Pawn structure: {score.pawn_struct}")
     print(f"  King safety: {score.king_safety}")
 
-    # Calculate final evaluation using the same formula as evaluate_position
-    phase = min(score.npm // NPM_SCALAR, 256)
-    interpolated_score = ((score.mg * phase) + (score.eg * (256 - phase))) >> 8
-    interpolated_pawn_struct = (score.pawn_struct * (256 - phase)) >> 8
-    final_score = score.material + interpolated_score + interpolated_pawn_struct
+    final_score = score.calculate()
     print(f"  Final evaluation: {final_score}")
     print()
 
@@ -47,45 +43,30 @@ def test_position(fen, move_uci=None):
     # If a move is provided, test updating
     if move_uci:
         # Create a copy of the score for updating
-        update_score = Score(init_score.material, init_score.mg, init_score.eg, init_score.npm, init_score.pawn_struct, init_score.king_safety)
+        incremental_score = Score(init_score.material, init_score.mg, init_score.eg, init_score.npm, init_score.pawn_struct, init_score.king_safety)
 
         # Make the move and update the score
         move = chess.Move.from_uci(move_uci)
-        update_score = update_score.updated(board, move)
-        board.push(move)
-
-        # Print the updated score
-        print_score_details(update_score, "After Update")
+        incremental_score = incremental_score.updated(board, move)
+        print_score_details(incremental_score, "After Incremental Update")
 
         # Initialize a fresh score for the resulting position
+        board.push(move)
         fresh_score = Score(0, 0, 0, 0, 0, 0)
         fresh_score.initialize_scores(board)
         print_score_details(fresh_score, "Fresh Initialization of New Position")
 
-        # Compare the scores
-        material_diff = update_score.material - fresh_score.material
-        mg_diff = update_score.mg - fresh_score.mg
-        eg_diff = update_score.eg - fresh_score.eg
-        npm_diff = update_score.npm - fresh_score.npm
-        pawn_struct_diff = update_score.pawn_struct - fresh_score.pawn_struct
-        king_safety_diff = update_score.king_safety - fresh_score.king_safety
+        # Assert scores match
+        assert(incremental_score.material == fresh_score.material), f"Material scores do not match: {incremental_score.material} != {fresh_score.material}"
+        assert(incremental_score.mg == fresh_score.mg), f"Midgame scores do not match: {incremental_score.mg} != {fresh_score.mg}"
+        assert(incremental_score.eg == fresh_score.eg), f"Endgame scores do not match: {incremental_score.eg} != {fresh_score.eg}"
+        assert(incremental_score.npm == fresh_score.npm), f"Non-pawn material scores do not match: {incremental_score.npm} != {fresh_score.npm}"
+        assert(incremental_score.pawn_struct == fresh_score.pawn_struct), f"Pawn structure scores do not match: {incremental_score.pawn_struct} != {fresh_score.pawn_struct}"
+        assert(incremental_score.king_safety == fresh_score.king_safety), f"King safety scores do not match: {incremental_score.king_safety} != {fresh_score.king_safety}"
 
-        print("Differences (Update - Fresh Init):")
-        print(f"  Material: {highlight_diff(material_diff)}")
-        print(f"  Midgame: {highlight_diff(mg_diff)}")
-        print(f"  Endgame: {highlight_diff(eg_diff)}")
-        print(f"  Non-pawn material: {highlight_diff(npm_diff)}")
-        print(f"  Pawn structure: {highlight_diff(pawn_struct_diff)}")
-        print(f"  King safety: {highlight_diff(king_safety_diff)}")
-
-        print()
-
-        assert(material_diff == 0)
-        assert(mg_diff == 0)
-        assert(eg_diff == 0)
-        assert(npm_diff == 0)
-        assert(pawn_struct_diff == 0)
-        assert(king_safety_diff == 0)
+        incremental = incremental_score.calculate()
+        fresh = fresh_score.calculate()
+        assert(incremental == fresh), f"Final scores do not match: {incremental} != {fresh}"
 
     print("-" * 80)
     return board

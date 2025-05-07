@@ -293,31 +293,27 @@ class ChessGame:
                 print(f"Illegal move attempted: {move}")
                 break
 
-            phase = min(self.score.npm // NPM_SCALAR, 256) # Phase value between 0 and 256 (0 = endgame, 256 = opening)
-            interpolated_score = ((self.score.mg * phase) + (self.score.eg * (256 - phase))) >> 8 # Int division by 256
-            pawn_struct = self.score.pawn_struct
-            interpolated_pawn_struct = (pawn_struct * (256 - phase)) >> 8
-            cached_score = self.score.material + interpolated_score + interpolated_pawn_struct
+            incremental_score = self.score
+            incremental = self.score.calculate()
 
             # Test if cached score is correct
             actual_score = Score(0, 0, 0, 0, 0, 0)
             actual_score.initialize_scores(self.board.get_board_state())
-            actual_pawn_struct = actual_score.pawn_struct
+            actual = actual_score.calculate()
 
-            print(f"Pawn structure: {pawn_struct}, {actual_pawn_struct}")
-
-            phase = min(actual_score.npm // NPM_SCALAR, 256)
-            interpolated_score = ((actual_score.mg * phase) + (actual_score.eg * (256 - phase))) >> 8
-            interpolated_pawn_struct = (actual_pawn_struct * (256 - phase)) >> 8
-            actual_score = actual_score.material + interpolated_score + interpolated_pawn_struct
-
-            # assert cached_score == actual_score, f"Eval: {cached_score}, {actual_score}"
-            print(f"Eval: {cached_score}, {actual_score}")
+            print(f"Eval: {incremental}, {actual}")
             
             print(f"Move played: {move}")
 
-            assert(pawn_struct == actual_pawn_struct)
-            assert(cached_score == actual_score)
+            # Assert scores match
+            assert(incremental_score.material == actual_score.material), f"Material score mismatch: {incremental_score.material} != {actual_score.material}"
+            assert(incremental_score.mg == actual_score.mg), f"Midgame score mismatch: {incremental_score.mg} != {actual_score.mg}"
+            assert(incremental_score.eg == actual_score.eg), f"Endgame score mismatch: {incremental_score.eg} != {actual_score.eg}"
+            assert(incremental_score.npm == actual_score.npm), f"Non-pawn material score mismatch: {incremental_score.npm} != {actual_score.npm}"
+            assert(incremental_score.pawn_struct == actual_score.pawn_struct), f"Pawn structure score mismatch: {incremental_score.pawn_struct} != {actual_score.pawn_struct}"
+            assert(incremental_score.king_safety == actual_score.king_safety), f"King safety score mismatch: {incremental_score.king_safety} != {actual_score.king_safety}"
+
+            assert(incremental == actual), f"Score mismatch: {incremental} != {actual}"
 
             print("-------------------")
             self.last_move = move
