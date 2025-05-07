@@ -295,8 +295,9 @@ class ChessGame:
 
             phase = min(self.score.npm // NPM_SCALAR, 256) # Phase value between 0 and 256 (0 = endgame, 256 = opening)
             interpolated_score = ((self.score.mg * phase) + (self.score.eg * (256 - phase))) >> 8 # Int division by 256
-            cached_score = self.score.material + interpolated_score
             pawn_struct = self.score.pawn_struct
+            interpolated_pawn_struct = (pawn_struct * (256 - phase)) >> 8
+            cached_score = self.score.material + interpolated_score + interpolated_pawn_struct
 
             # Test if cached score is correct
             actual_score = Score(0, 0, 0, 0, 0, 0)
@@ -307,13 +308,17 @@ class ChessGame:
 
             phase = min(actual_score.npm // NPM_SCALAR, 256)
             interpolated_score = ((actual_score.mg * phase) + (actual_score.eg * (256 - phase))) >> 8
-            actual_score = actual_score.material + interpolated_score
+            interpolated_pawn_struct = (actual_pawn_struct * (256 - phase)) >> 8
+            actual_score = actual_score.material + interpolated_score + interpolated_pawn_struct
 
             # assert cached_score == actual_score, f"Eval: {cached_score}, {actual_score}"
             print(f"Eval: {cached_score}, {actual_score}")
             
             print(f"Move played: {move}")
+
             assert(pawn_struct == actual_pawn_struct)
+            assert(cached_score == actual_score)
+
             print("-------------------")
             self.last_move = move
 

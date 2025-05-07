@@ -3,3 +3,5 @@ venv/
 .venv/
 .vscode/
 .ropeproject/
+profile.pyspy
+current_board.svg

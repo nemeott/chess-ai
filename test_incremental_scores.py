@@ -19,7 +19,8 @@ def print_score_details(score, label=""):
     # Calculate final evaluation using the same formula as evaluate_position
     phase = min(score.npm // NPM_SCALAR, 256)
     interpolated_score = ((score.mg * phase) + (score.eg * (256 - phase))) >> 8
-    final_score = score.material + interpolated_score
+    interpolated_pawn_struct = (score.pawn_struct * (256 - phase)) >> 8
+    final_score = score.material + interpolated_score + interpolated_pawn_struct
     print(f"  Final evaluation: {final_score}")
     print()
 
@@ -126,3 +127,7 @@ if __name__ == "__main__":
     # Position 8: Self isolation (covid pawn)
     fen8 = "r1bq1rk1/pp3ppp/2p2n2/4n1N1/1b1p4/4p1N1/PPP1BPPP/R1BQ2KR w - - 0 12"
     board8 = test_position(fen8, "f2e3")  # Pawn takes pawn
+
+    # Position 9:
+    fen9 = "r1b1k2r/pppp1p1p/4p1pB/4P3/3P3q/6P1/PPP2K1P/RN3BNR b kq - 0 12"
+    board9 = test_position(fen9, "h4d4")  # Queen takes pawn

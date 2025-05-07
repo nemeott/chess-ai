@@ -147,7 +147,7 @@ class Score: # Positive values favor white, negative values favor black
         to_square = move.to_square
         promotion_piece_type: chess.PieceType = move.promotion
 
-        piece_type = board.piece_type_at(from_square)
+        piece_type = board.piece_type_at(from_square) # ? Expensivish
         piece_color = board.turn
         color_multiplier = 1 if piece_color else -1
 
@@ -158,21 +158,7 @@ class Score: # Positive values favor white, negative values favor black
         flip = FLIP
         
         castling = False
-        if piece_type == chess.KING: # Update rook scores if castling
-            castle_info = CASTLING_UPDATES.get((from_square, to_square, piece_color))
-            if castle_info:
-                castling = True
-                mg_rook_table = mg_tables[chess.ROOK]
-                eg_rook_table = eg_tables[chess.ROOK]
-
-                rook_from, rook_to = castle_info
-                if piece_color: # Flip rook square for white
-                    rook_from, rook_to = flip[rook_from], flip[rook_to]
-
-                mg += color_multiplier * (mg_rook_table[rook_to] - mg_rook_table[rook_from])
-                eg += color_multiplier * (eg_rook_table[rook_to] - eg_rook_table[rook_from])
-
-        elif piece_type == chess.PAWN: # Update pawn structure if moving a pawn
+        if piece_type == chess.PAWN: # Update pawn structure if moving a pawn
             pawns_before = board.pieces_mask(chess.PAWN, piece_color)
             pawns_after = pawns_before & ~(1 << from_square) # Remove moved pawn from pawns
             if promotion_piece_type: # If we are promoting, then we need to account for the dissapearance of the pawn
@@ -253,6 +239,20 @@ class Score: # Positive values favor white, negative values favor black
                     if right_pawns >= 1 and pawns_in_to_file == 1 and (chess.popcount(pawns_after & file_masks[to_file + 2]) if to_file < 6 else 0) == 0: # Right adj was isolated
                         pawn_struct += color_multiplier * 20 # Remove penalty
 
+        elif piece_type == chess.KING: # Update rook scores if castling
+            castle_info = CASTLING_UPDATES.get((from_square, to_square, piece_color))
+            if castle_info:
+                castling = True
+                mg_rook_table = mg_tables[chess.ROOK]
+                eg_rook_table = eg_tables[chess.ROOK]
+
+                rook_from, rook_to = castle_info
+                if piece_color: # Flip rook square for white
+                    rook_from, rook_to = flip[rook_from], flip[rook_to]
+
+                mg += color_multiplier * (mg_rook_table[rook_to] - mg_rook_table[rook_from])
+                eg += color_multiplier * (eg_rook_table[rook_to] - eg_rook_table[rook_from])
+
 
         # Flip squares for white
         new_from_square, new_to_square = from_square, to_square
@@ -274,15 +274,15 @@ class Score: # Positive values favor white, negative values favor black
         else: # Normal move
             mg_table = mg_tables[piece_type]
             eg_table = eg_tables[piece_type]
-            mg += color_multiplier * (mg_table[new_to_square] - mg_table[new_from_square])
-            eg += color_multiplier * (eg_table[new_to_square] - eg_table[new_from_square])
+            mg += color_multiplier * (mg_table[new_to_square] - mg_table[new_from_square]) # ? Expensive
+            eg += color_multiplier * (eg_table[new_to_square] - eg_table[new_from_square]) # ? Expensive (less)
 
         if castling: # Done if castling
             return Score(material, mg, eg, npm, pawn_struct, king_safety)
 
 
         # Handle captures
-        captured_piece_type = board.piece_type_at(to_square)
+        captured_piece_type = board.piece_type_at(to_square) # ? Expensivish
 
         # Get en passant capture piece if applicable
         if not captured_piece_type and piece_type == chess.PAWN and board.is_en_passant(move):
@@ -328,7 +328,7 @@ class Score: # Positive values favor white, negative values favor black
             mg -= -color_multiplier * mg_tables[captured_piece_type][to_square]
             eg -= -color_multiplier * eg_tables[captured_piece_type][to_square]
 
-        return Score(material, mg, eg, npm, pawn_struct, king_safety)
+        return Score(material, mg, eg, npm, pawn_struct, king_safety) # ? Expensive
 
 
 class ChessBot:
@@ -373,7 +373,8 @@ class ChessBot:
         phase = min(score.npm // NPM_SCALAR, 256) # Phase value between 0 and 256 (0 = endgame, 256 = opening)
         assert 0 <= phase <= 256, f"Phase value out of bounds: {phase}" # TODO remove when done testing
         interpolated_score = ((int(score.mg) * phase) + (int(score.eg) * (256 - phase))) >> 8 # Int division by 256
-        return score.material + interpolated_score
+        interpolated_pawn_struct = (int(score.pawn_struct) * (256 - phase)) >> 8 # Int division by 256
+        return score.material + interpolated_score + interpolated_pawn_struct
 
     # def quiescence(self, board: chess.Board, alpha, beta, depth):
 
