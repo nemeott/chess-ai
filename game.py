@@ -4,10 +4,12 @@ from board import ChessBoard
 from bot2 import ChessBot, Score
 from human import HumanPlayer
 import pygame
-import cairosvg
+import cairosvg # type: ignore[import-untyped]
 import io
 from PIL import Image
 import math # For quick render arrows
+import numpy as np
+from typing import Literal, Union, Optional
 
 from constants import IS_BOT, NPM_SCALAR, UPDATE_DELAY_MS, LAST_MOVE_ARROW, CHECKING_MOVE_ARROW, BREAK_TURN
 
@@ -17,12 +19,14 @@ class ChessGame:
     def __init__(self):
         self.board = ChessBoard()
 
-        self.checking_move = None # Current move to check
-        self.last_move = None # Last move played
+        self.checking_move: Optional[chess.Move] = None # Current move to check
+        self.last_move: Optional[chess.Move] = None # Last move played
         self.last_update_time: int = pygame.time.get_ticks()
-        
-        self.score = Score(0, 0, 0, 0, 0, 0)  # Score object to store material, mg, eg, and npm scores
-        self.score.initialize_scores(self.board.get_board_state()) # Initialize scores once and update from there
+
+        # Allow either type
+        temp_bot = ChessBot(self)
+        self.white_player: Union[HumanPlayer, ChessBot] = temp_bot # Type hint for white player
+        self.black_player: Union[HumanPlayer, ChessBot] = temp_bot # Type hint for black player
 
         # Initialize players based on IS_BOT flag
         if IS_BOT:
@@ -31,6 +35,9 @@ class ChessGame:
         else:
             self.white_player = HumanPlayer(chess.WHITE, self)
             self.black_player = ChessBot(self)
+            
+        self.score = Score()
+        self.score.initialize_scores(self.board.get_board_state()) # Initialize scores once and update from there
 
         # Cache for piece images and board squares
         self.piece_images = {}
@@ -59,7 +66,7 @@ class ChessGame:
         # Pre-render the empty board
         self.empty_board_surface = self.create_empty_board()
 
-    def svg_to_pygame_surface(self, svg_string):
+    def svg_to_pygame_surface(self, svg_string: str) -> pygame.Surface:
         """Convert SVG string to Pygame surface with optimized parameters"""
         # Reduce the resolution if it's just for pieces (they'll be scaled anyway)
         png_data = cairosvg.svg2png(
@@ -68,14 +75,17 @@ class ChessGame:
             output_height=self.WINDOW_SIZE
         )
         # Skip resizing step since we specified size in cairosvg
+        if png_data is None:
+            raise ValueError("Failed to convert SVG to PNG.")
         image = Image.open(io.BytesIO(png_data))
         mode = image.mode
         size = image.size
         data = image.tobytes()
         
-        return pygame.image.fromstring(data, size, mode)
+        mode_literal: Literal['P', 'RGB', 'RGBX', 'RGBA', 'ARGB', 'BGRA'] = mode  # type: ignore
+        return pygame.image.fromstring(data, size, mode_literal)
 
-    def create_empty_board(self):
+    def create_empty_board(self) -> pygame.Surface:
         """Create and cache the empty chess board with squares"""
         square_size = self.WINDOW_SIZE // 8
         surface = pygame.Surface((self.WINDOW_SIZE, self.WINDOW_SIZE))
@@ -220,7 +230,10 @@ class ChessGame:
         if CHECKING_MOVE_ARROW and self.checking_move:
             # Use fast direct rendering during AI analysis
             board_surface = self.fast_render_board(last_move, selected_square)
-            self.screen.blit(board_surface, (0, 0))
+            if board_surface is not None:
+                self.screen.blit(board_surface, (0, 0))
+            else:
+                raise ValueError("fast_render_board returned None, cannot blit to screen.")
         else:
             # Use pretty SVG rendering during normal gameplay
             # Build highlight dictionary for the selected square
@@ -267,6 +280,8 @@ class ChessGame:
     def play_game(self):
         """Main game loop"""
         print("-------------------")
+
+        # _ = self.score.numba_calculate(0, 0, 0, 0, 0, 0) # Warm up numba cache
         
         while not self.board.is_game_over():
             print(f"Player: {'White' if self.board.get_board_state().turn else 'Black'} - {self.board.get_board_state().fullmove_number}")
@@ -297,7 +312,7 @@ class ChessGame:
             incremental = self.score.calculate()
 
             # Test if cached score is correct
-            actual_score = Score(0, 0, 0, 0, 0, 0)
+            actual_score = Score()
             actual_score.initialize_scores(self.board.get_board_state())
             actual = actual_score.calculate()
 

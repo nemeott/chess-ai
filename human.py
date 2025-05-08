@@ -30,7 +30,7 @@ class HumanPlayer:
     def get_promotion_choice(self):
         """Get the promotion piece choice from the player through clickable buttons with piece icons."""
         import chess.svg
-        import cairosvg
+        import cairosvg # type: ignore[import-untyped]
         import io
         from PIL import Image
         
@@ -62,12 +62,14 @@ class HumanPlayer:
         # Function to convert SVG to Pygame surface
         def svg_to_pygame_surface(svg_string, size):
             png_data = cairosvg.svg2png(bytestring=svg_string.encode('utf-8'))
+            if png_data is None:
+                raise ValueError("Failed to convert SVG to PNG.")
             image = Image.open(io.BytesIO(png_data))
             image = image.resize((size, size))
             mode = image.mode
             size = image.size
             data = image.tobytes()
-            return pygame.image.fromstring(data, size, mode)
+            return pygame.image.fromstring(data, size, mode) # type: ignore
         
         # Draw buttons and store their rects
         buttons = []

@@ -1,16 +1,18 @@
 import chess
 import numpy as np  # For piece square tables
 from typing_extensions import TypeAlias  # For GameStage
+from typing import Optional
+from numpy.typing import NDArray  # Add this import at the top of the file if not already present
 
 # Set to None for standard starting position, or FEN string for custom starting position
-STARTING_FEN: str = None
+STARTING_FEN: Optional[str] = None
 # STARTING_FEN: str = "2kr1r2/p1p2p1p/4N1p1/1p2B3/5R2/1B4P1/P1P3KP/2q5 b - - 0 26" # Checkmate soon
 
 # STARTING_FEN: str = "r1b1k2r/pppp1p1p/4p1pB/4P3/3q4/6P1/PPP2K1P/RN3BNR w kq - 0 13"
 # STARTING_FEN: str = "r1b1k2r/pppp1p1p/4p1pB/4P3/8/6P1/PqP3KP/RN3BNR w kq - 0 14" # Big jump in evaluation
 
-MAX_VALUE: np.int16 = 32767 # 2**(16-1) - 1 (max value for 16 bit integer)
-MIN_VALUE: np.int16 = -32768 # -2**(16-1) (min value for 16 bit integer)
+MAX_VALUE: np.int16 = np.int16(32767) # 2**(16-1) - 1 (max value for 16 bit integer)
+MIN_VALUE: np.int16 = np.int16(-32768) # -2**(16-1) (min value for 16 bit integer)
 
 # CENTER_SQUARES = {chess.D4, chess.D5, chess.E4, chess.E5}  # Chess already has this built in
 
@@ -18,18 +20,18 @@ MIN_VALUE: np.int16 = -32768 # -2**(16-1) (min value for 16 bit integer)
 IS_BOT: bool = True  # Set to False for human vs bot, True for bot vs bot
 # IS_BOT: bool = False  # Set to False for human vs bot, True for bot vs bot
 LAST_MOVE_ARROW: bool = True  # Set to True to display last move arrow
-TT_SIZE: np.int8 = 64 # Size of the transposition table (in MB)
+TT_SIZE: np.int8 = np.int8(64) # Size of the transposition table (in MB)
 
 # Debug settings
 CHECKING_MOVE_ARROW: bool = False  # Set to True to display checking move arrow (switches the mode to svg rendering)
-UPDATE_DELAY_MS: np.int8 = 30  # Delay between visual updates in milliseconds
-RENDER_DEPTH: np.int8 = 5 # Depth to render checking moves (set to DEPTH to render root moves)
+UPDATE_DELAY_MS: np.int8 = np.int8(30)  # Delay between visual updates in milliseconds
+RENDER_DEPTH: np.int8 = np.int8(5) # Depth to render checking moves (set to DEPTH to render root moves)
 
-BREAK_TURN: np.int8 = None # Number of turns to break after (for debugging)
+BREAK_TURN: Optional[np.int8] = None # Number of turns to break after (for debugging)
 # BREAK_TURN: np.int8 = 5 # Number of turns to break after (for debugging)
 
 # Search settings
-DEPTH: np.int8 = 5  # Search depth for the minimax algorithm
+DEPTH: np.int8 = np.int8(5)  # Search depth for the minimax algorithm
 # RENDER_DEPTH: np.int8 = 0 # Depth to render checking moves (set to DEPTH to render root moves)
 
 
@@ -56,17 +58,17 @@ PIECE_VALUES_STOCKFISH: dict[int, int] = {
 BISHOP_PAIR_BONUS: int = PIECE_VALUES_STOCKFISH[chess.PAWN] >> 1 # Half the value of a pawn
 
 # Total npm at start (16604 with stockfish values)
-START_NPM: np.int16 = PIECE_VALUES_STOCKFISH[chess.KNIGHT] * 4 + \
+START_NPM: np.int16 = np.int16(PIECE_VALUES_STOCKFISH[chess.KNIGHT] * 4 + \
     PIECE_VALUES_STOCKFISH[chess.BISHOP] * 4 + \
     PIECE_VALUES_STOCKFISH[chess.ROOK] * 4 + \
-    PIECE_VALUES_STOCKFISH[chess.QUEEN] * 2
+    PIECE_VALUES_STOCKFISH[chess.QUEEN] * 2)
 # NPM scalar for evaluation (65 with stockfish values)
-NPM_SCALAR: np.int8 = (START_NPM // 256) + 1
+NPM_SCALAR: np.int8 = np.int8((START_NPM // 256) + 1)
 
 # Game stages
-GameStage: TypeAlias = np.int8
-MIDGAME: GameStage = 0
-ENDGAME: GameStage = 1
+GameStage: TypeAlias = bool
+MIDGAME: GameStage = False
+ENDGAME: GameStage = True
 
 # TODO Autotune these values
 # Piece square tables from Rofchade
@@ -214,7 +216,7 @@ FLIP = np.array([
      0,  1,  2,  3,  4,  5,  6,  7,
 ], dtype=np.int32)
 
-PSQT: list[list[chess.PieceType, np.ndarray]] = [ # Using a list instead of a dict for less overhead (PSQT[MIDGAME/ENDGAME][piece_type][square])
+PSQT: list[list[Optional[NDArray[np.int32]]]] = [ # Using a list instead of a dict for less overhead (PSQT[MIDGAME/ENDGAME][piece_type][square])
     [
         None, # Python chess starts piece indexing at 1, so we add empty slots
         mg_pawn_table,
@@ -236,7 +238,7 @@ PSQT: list[list[chess.PieceType, np.ndarray]] = [ # Using a list instead of a di
 ]
 
 # Use a dict for faster lookup of castling updates
-CASTLING_UPDATES: dict[tuple[int, int], tuple[int, int, bool]] = {
+CASTLING_UPDATES: dict[tuple[chess.Square, chess.Square, chess.Color], tuple[chess.Square, chess.Square]] = {
     # (from_square, to_square, color): (rook_from, rook_to)
     (chess.E1, chess.G1, chess.WHITE): (chess.H1, chess.F1), # White kingside
     (chess.E1, chess.C1, chess.WHITE): (chess.A1, chess.D1), # White queenside

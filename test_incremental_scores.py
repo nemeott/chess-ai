@@ -1,6 +1,7 @@
 import chess
 import sys
 from bot2 import Score, MIDGAME, ENDGAME, PSQT, PIECE_VALUES_STOCKFISH, FLIP, NPM_SCALAR
+from timeit import default_timer
 
 # ANSI color codes
 RED = "\033[91m"
@@ -36,7 +37,7 @@ def test_position(fen, move_uci=None):
     print()
 
     # Initialize from scratch
-    init_score = Score(0, 0, 0, 0, 0, 0)
+    init_score = Score()
     init_score.initialize_scores(board)
     print_score_details(init_score, "Initialized")
 
@@ -52,7 +53,7 @@ def test_position(fen, move_uci=None):
 
         # Initialize a fresh score for the resulting position
         board.push(move)
-        fresh_score = Score(0, 0, 0, 0, 0, 0)
+        fresh_score = Score()
         fresh_score.initialize_scores(board)
         print_score_details(fresh_score, "Fresh Initialization of New Position")
 
@@ -112,3 +113,25 @@ if __name__ == "__main__":
     # Position 9:
     fen9 = "r1b1k2r/pppp1p1p/4p1pB/4P3/3P3q/6P1/PPP2K1P/RN3BNR b kq - 0 12"
     board9 = test_position(fen9, "h4d4")  # Queen takes pawn
+
+
+    # Test numba speed
+
+    board = chess.Board(fen1)
+    score = Score()
+    score.initialize_scores(board1)
+
+    # _ = score._calculate_score(0, 0, 0, 0, 0)
+
+    start_time = default_timer()
+
+    for i in range(1_000_000):
+        new_score = score.updated(board, chess.Move.from_uci("b5c7"))
+        calculated = new_score.calculate()
+        if i % 100_000 == 0:
+            print(f"Score after {i} moves: {calculated}")
+
+    time_taken = default_timer() - start_time
+
+    print(f"Time taken for 1,000,000 moves: {time_taken:.2f} seconds")
+    print(f"Time per move: {time_taken / 1_000_000 * 1_000:.4f} ms")
