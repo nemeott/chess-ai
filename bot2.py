@@ -3,6 +3,7 @@ import chess
 from chess.polyglot import zobrist_hash # Built-in Zobrist hashing  TODO implement incremental hashing
 
 from dataclasses import dataclass  # For TT entries and scores
+from numpy._typing._array_like import NDArray # type: ignore
 from typing_extensions import TypeAlias  # For flags
 import numpy as np
 from typing import Generator, Optional, TYPE_CHECKING
@@ -18,7 +19,7 @@ from constants import DEPTH, MAX_VALUE, MIN_VALUE, CHECKING_MOVE_ARROW, RENDER_D
 import colors  # Debug log colors
 from timeit import default_timer # For debugging timing
 
-# from numba import njit, vectorize
+from numba import jit, njit, vectorize
 
 
 # Transposition table entry flags
@@ -43,23 +44,31 @@ class TTEntry:
 class Score: # Positive values favor white, negative values favor black
     __slots__ = ["material", "mg", "eg", "npm", "pawn_struct", "king_safety"] # Optimization for faster lookups
 
-    material: np.int16 # Material score
-    mg: np.int16 # Midgame score
-    eg: np.int16 # Endgame score
-    npm: np.uint16 # Non-pawn material (for phase calculation)
-    pawn_struct: np.int8 # Pawn structure score TODO: Check for overflow
-    king_safety: np.int8 # King safety score
-
     def __init__(self, material: np.int16 = np.int16(0), mg: np.int16 = np.int16(0), eg: np.int16 = np.int16(0), npm: np.uint16 = np.uint16(0), pawn_struct: np.int8 = np.int8(0), king_safety: np.int8 = np.int8(0)) -> None:
         """
         Initialize the score with given values.
         """
-        self.material = material
-        self.mg = mg
-        self.eg = eg
-        self.npm = npm
-        self.pawn_struct = pawn_struct
-        self.king_safety = king_safety
+        self.material: np.int16 = material # Material score
+        self.mg: np.int16 = mg # Midgame score
+        self.eg: np.int16 = eg # Endgame score
+        self.npm: np.uint16 = npm # Non-pawn material (for phase calculation)
+        self.pawn_struct: np.int8 = pawn_struct # Pawn structure score TODO: Check for overflow
+        self.king_safety: np.int8 = king_safety # King safety score
+
+    @staticmethod
+    @njit(cache=True)
+    def _numba_calculate(material, mg, eg, npm, pawn_struct, king_safety) -> np.int16:
+        # Phase value between 0 and 256 (0 = endgame, 256 = opening)
+        phase = min(npm // NPM_SCALAR, 256)
+        # assert 0 <= phase <= 256, f"Phase value out of bounds: {phase}"
+
+        # Interpolate between midgame and endgame scores
+        interpolated_mg_eg_score: int = ((int(mg) * phase) + (int(eg) * (256 - phase))) >> 8 
+
+        # Interpolate the pawn structure score (more important in endgame)
+        interpolated_pawn_struct: int = (int(pawn_struct) * (256 - phase)) >> 8
+
+        return material + interpolated_mg_eg_score + interpolated_pawn_struct
 
     def calculate(self) -> np.int16:
         """
@@ -68,19 +77,48 @@ class Score: # Positive values favor white, negative values favor black
         Also uses the phase to weight the pawn structure score (more important in endgame).
         Adds the material score, interpolated mg/eg score, and interpolated pawn structure score.
         """
-        # Phase value between 0 and 256 (0 = endgame, 256 = opening)
-        phase = min(self.npm // NPM_SCALAR, 256)
-        # assert 0 <= phase <= 256, f"Phase value out of bounds: {phase}"
+        return self._numba_calculate(self.material, self.mg, self.eg, self.npm, self.pawn_struct, self.king_safety)
 
-        # Interpolate between midgame and endgame scores
-        interpolated_mg_eg_score: int = ((int(self.mg) * phase) + (int(self.eg) * (256 - phase))) >> 8 
+    # def numpy_calculate(self, board: chess.Board) -> int:
+    #     """
+    #     UNUSED
+    #     Attempt to use numpy for efficient calculations.
+    #     (Definitely didn't work but left in case future optimizations possible)
+    #     """
+    #     # Cache tables for faster lookups  
+    #     mg_tables = PSQT[MIDGAME]
+    #     eg_tables = PSQT[ENDGAME]
 
-        # Interpolate the pawn structure score (more important in endgame)
-        interpolated_pawn_struct: int = (int(self.pawn_struct) * (256 - phase)) >> 8
+    #     material, mg, eg, npm, pawn_struct, king_safety = 0, 0, 0, 0, 0, 0
+    #     for piece_type, piece_value in PIECE_VALUES_STOCKFISH.items():
+    #         if piece_type != chess.KING:
+    #             white_bitboard = board.pieces_mask(piece_type, chess.WHITE)
+    #             black_bitboard = board.pieces_mask(piece_type, chess.BLACK)
+    #             black_bitboard = chess.flip_horizontal(chess.flip_vertical(black_bitboard))
 
-        return self.material + interpolated_mg_eg_score + interpolated_pawn_struct
+    #             white_bits = np.unpackbits(np.frombuffer(np.uint64(white_bitboard).tobytes(), dtype=np.uint8))
+    #             black_bits = np.unpackbits(np.frombuffer(np.uint64(black_bitboard).tobytes(), dtype=np.uint8))
 
-    def initialize_scores(self, board: chess.Board) -> None:
+    #             # Material score
+    #             white_material = (np.int16(white_bits) * piece_value).sum(dtype=np.int16)
+    #             black_material = (np.int16(black_bits) * piece_value).sum(dtype=np.int16)
+    #             material += white_material - black_material
+
+    #             # Non-pawn material score
+    #             if piece_type != chess.PAWN:
+    #                 npm += white_material + black_material
+
+    #             # Midgame and endgame scores
+    #             mg += np.dot(white_bits, mg_tables[piece_type]) - np.dot(black_bits, mg_tables[piece_type]) # type: ignore
+    #             eg += np.dot(white_bits, eg_tables[piece_type]) - np.dot(black_bits, eg_tables[piece_type]) # type: ignore
+
+    #     # Phase value between 0 and 256 (0 = endgame, 256 = opening)
+    #     phase = min(npm // NPM_SCALAR, 256) # type: ignore
+
+    #     return material + (((mg * phase) + (eg * (256 - phase))) >> 8)
+
+
+    def initialize(self, board: chess.Board) -> None:
         """
         Initialize values for starting position (works with custom starting FENs).
         Calculates material score, npm score, and evaluates piece positions.
@@ -189,7 +227,7 @@ class Score: # Positive values favor white, negative values favor black
         piece_values: dict[int, int] = PIECE_VALUES_STOCKFISH
         mg_tables: list[Optional[np.ndarray]] = PSQT[MIDGAME]
         eg_tables: list[Optional[np.ndarray]] = PSQT[ENDGAME]
-        flip = FLIP
+        flip = FLIP # TODO: Check squares are correctly flipped
         
         castling = False
         if piece_type == chess.PAWN: # Update pawn structure if moving a pawn

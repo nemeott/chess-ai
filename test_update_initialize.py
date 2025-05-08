@@ -18,7 +18,7 @@ class TestScoreUpdate(unittest.TestCase):
         """Initialize test environment."""
         self.board = chess.Board()
         self.score = Score(material=0, mg=0, eg=0, npm=0)
-        self.score.initialize_scores(self.board)
+        self.score.initialize(self.board)
         
     def test_pawn_move(self):
         """Test updating score for a simple pawn move."""
@@ -50,7 +50,7 @@ class TestScoreUpdate(unittest.TestCase):
         # Setup board with a capture possibility
         self.board = chess.Board("rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2")
         self.score = Score(material=0, mg=0, eg=0, npm=0)
-        self.score.initialize_scores(self.board)
+        self.score.initialize(self.board)
         
         # Store original values
         original_material = self.score.material
@@ -71,7 +71,7 @@ class TestScoreUpdate(unittest.TestCase):
         # Setup board with two bishops for black
         self.board = chess.Board("r1bqk1nr/pppp1ppp/2n5/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4")
         self.score = Score(material=0, mg=0, eg=0, npm=0)
-        self.score.initialize_scores(self.board)
+        self.score.initialize(self.board)
         
         original_material = self.score.material
         
@@ -93,7 +93,7 @@ class TestScoreUpdate(unittest.TestCase):
         # Setup board ready for castling
         self.board = chess.Board("r3k2r/pppqbppp/2np1n2/2b1p3/2B1P3/2NP1N2/PPPQBPPP/R3K2R w KQkq - 6 8")
         self.score = Score(material=0, mg=0, eg=0, npm=0)
-        self.score.initialize_scores(self.board)
+        self.score.initialize(self.board)
         
         # Store original values
         original_mg = self.score.mg
@@ -114,7 +114,7 @@ class TestScoreUpdate(unittest.TestCase):
         # Setup board with a pawn ready to promote
         self.board = chess.Board("8/P7/8/8/8/8/8/k6K w - - 0 1")
         self.score = Score(material=0, mg=0, eg=0, npm=0)
-        self.score.initialize_scores(self.board)
+        self.score.initialize(self.board)
         
         original_material = self.score.material
         original_npm = self.score.npm
@@ -189,7 +189,7 @@ class BenchmarkTests(unittest.TestCase):
         for _, move_path in positions:
             board = chess.Board()
             score = Score(material=0, mg=0, eg=0, npm=0)
-            score.initialize_scores(board)
+            score.initialize(board)
             
             # Apply each move and update score
             for move in move_path:
@@ -204,7 +204,7 @@ class BenchmarkTests(unittest.TestCase):
         for final_board, _ in positions:
             # Initialize from scratch for each position
             score = Score(material=0, mg=0, eg=0, npm=0)
-            score.initialize_scores(final_board)
+            score.initialize(final_board)
             
             # In a real search, we'd evaluate the position here
         init_time = timer() - start_time
@@ -289,7 +289,7 @@ class BenchmarkTests(unittest.TestCase):
         for final_board, path in paths_to_evaluate:
             board = chess.Board()
             score = Score(material=0, mg=0, eg=0, npm=0)
-            score.initialize_scores(board)  # Initialize once at the root
+            score.initialize(board)  # Initialize once at the root
             
             # Apply each move and update score incrementally
             for move in path:
@@ -305,7 +305,7 @@ class BenchmarkTests(unittest.TestCase):
         for final_board, _ in paths_to_evaluate:
             # Initialize from scratch at each leaf node
             score = Score(material=0, mg=0, eg=0, npm=0)
-            score.initialize_scores(final_board)
+            score.initialize(final_board)
             
             # Evaluate at leaf node (simulated)
             evaluation = score.material + score.mg + score.eg

@@ -37,7 +37,7 @@ class ChessGame:
             self.black_player = ChessBot(self)
             
         self.score = Score()
-        self.score.initialize_scores(self.board.get_board_state()) # Initialize scores once and update from there
+        self.score.initialize(self.board.get_board_state()) # Initialize scores once and update from there
 
         # Cache for piece images and board squares
         self.piece_images = {}
@@ -281,7 +281,9 @@ class ChessGame:
         """Main game loop"""
         print("-------------------")
 
-        # _ = self.score.numba_calculate(0, 0, 0, 0, 0, 0) # Warm up numba cache
+        # Warm up numba calculate function (compile)
+        _ = Score()
+        _ = _.calculate()
         
         while not self.board.is_game_over():
             print(f"Player: {'White' if self.board.get_board_state().turn else 'Black'} - {self.board.get_board_state().fullmove_number}")
@@ -313,7 +315,7 @@ class ChessGame:
 
             # Test if cached score is correct
             actual_score = Score()
-            actual_score.initialize_scores(self.board.get_board_state())
+            actual_score.initialize(self.board.get_board_state())
             actual = actual_score.calculate()
 
             print(f"Eval: {incremental}, {actual}")

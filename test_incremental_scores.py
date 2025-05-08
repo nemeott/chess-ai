@@ -38,7 +38,7 @@ def test_position(fen, move_uci=None):
 
     # Initialize from scratch
     init_score = Score()
-    init_score.initialize_scores(board)
+    init_score.initialize(board)
     print_score_details(init_score, "Initialized")
 
     # If a move is provided, test updating
@@ -54,7 +54,7 @@ def test_position(fen, move_uci=None):
         # Initialize a fresh score for the resulting position
         board.push(move)
         fresh_score = Score()
-        fresh_score.initialize_scores(board)
+        fresh_score.initialize(board)
         print_score_details(fresh_score, "Fresh Initialization of New Position")
 
         # Assert scores match
@@ -80,58 +80,58 @@ if __name__ == "__main__":
     fen1 = "r1b1r1k1/ppp2qbp/6p1/1N1p4/5B2/3p2P1/PPPK1p1P/R4Q1B w - - 0 25"
     board1 = test_position(fen1, "b5c7")  # Knight captures pawn
 
-    # Position 2: Black to move
-    fen2 = "r1b1r1k1/ppN2qbp/6p1/3p4/5B2/3p2P1/PPPK1p1P/R4Q1B b - - 0 25"
-    board2 = test_position(fen2, "c8h3")  # Bishop moves to h3
+    # # Position 2: Black to move
+    # fen2 = "r1b1r1k1/ppN2qbp/6p1/3p4/5B2/3p2P1/PPPK1p1P/R4Q1B b - - 0 25"
+    # board2 = test_position(fen2, "c8h3")  # Bishop moves to h3
 
-    # Position 3: White to move
-    fen3 = "r3r1k1/ppN2qbp/6p1/3p4/5B2/3p2Pb/PPPK1p1P/R4Q1B w - - 1 26"
-    board3 = test_position(fen3, "f1h3")  # Queen captures bishop
+    # # Position 3: White to move
+    # fen3 = "r3r1k1/ppN2qbp/6p1/3p4/5B2/3p2Pb/PPPK1p1P/R4Q1B w - - 1 26"
+    # board3 = test_position(fen3, "f1h3")  # Queen captures bishop
 
-    # Position 4: Black to move
-    # Black iso -> not iso
-    # Black doubled -> not doubled
-    fen4 = "r3r1k1/ppN2qbp/6p1/3p4/5B2/3p2PQ/PPPK1p1P/R6B b - - 0 26"
-    board4 = test_position(fen4, "d3c2")  # Pawn moves to c2
+    # # Position 4: Black to move
+    # # Black iso -> not iso
+    # # Black doubled -> not doubled
+    # fen4 = "r3r1k1/ppN2qbp/6p1/3p4/5B2/3p2PQ/PPPK1p1P/R6B b - - 0 26"
+    # board4 = test_position(fen4, "d3c2")  # Pawn moves to c2
 
-    # Position 5: White to move
-    fen5 = "r3r1k1/ppN2qbp/6p1/3p4/5B2/6PQ/PPpK1p1P/R6B w - - 0 27"
-    board5 = test_position(fen5, "c7a8")  # Knight captures rook
+    # # Position 5: White to move
+    # fen5 = "r3r1k1/ppN2qbp/6p1/3p4/5B2/6PQ/PPpK1p1P/R6B w - - 0 27"
+    # board5 = test_position(fen5, "c7a8")  # Knight captures rook
 
-    # Position 6
-    fen6 = "r1bqkb1r/ppp1pppp/2n2n2/3p4/3P4/2N2N2/PPP1PPPP/R1BQKB1R w KQkq - 2 4"
-    board6 = test_position(fen6, "c3d5")  # Pawn captures pawn
+    # # Position 6
+    # fen6 = "r1bqkb1r/ppp1pppp/2n2n2/3p4/3P4/2N2N2/PPP1PPPP/R1BQKB1R w KQkq - 2 4"
+    # board6 = test_position(fen6, "c3d5")  # Pawn captures pawn
 
-    # Position 7: Test promoting a pawn
-    fen7 = "8/1pp2p1P/8/1K6/8/5kP1/8/2r5 w - - 1 29"
-    board7 = test_position(fen7, "h7h8q")  # Pawn promotes to queen
+    # # Position 7: Test promoting a pawn
+    # fen7 = "8/1pp2p1P/8/1K6/8/5kP1/8/2r5 w - - 1 29"
+    # board7 = test_position(fen7, "h7h8q")  # Pawn promotes to queen
 
-    # Position 8: Self isolation (covid pawn)
-    fen8 = "r1bq1rk1/pp3ppp/2p2n2/4n1N1/1b1p4/4p1N1/PPP1BPPP/R1BQ2KR w - - 0 12"
-    board8 = test_position(fen8, "f2e3")  # Pawn takes pawn
+    # # Position 8: Self isolation (covid pawn)
+    # fen8 = "r1bq1rk1/pp3ppp/2p2n2/4n1N1/1b1p4/4p1N1/PPP1BPPP/R1BQ2KR w - - 0 12"
+    # board8 = test_position(fen8, "f2e3")  # Pawn takes pawn
 
-    # Position 9:
-    fen9 = "r1b1k2r/pppp1p1p/4p1pB/4P3/3P3q/6P1/PPP2K1P/RN3BNR b kq - 0 12"
-    board9 = test_position(fen9, "h4d4")  # Queen takes pawn
+    # # Position 9:
+    # fen9 = "r1b1k2r/pppp1p1p/4p1pB/4P3/3P3q/6P1/PPP2K1P/RN3BNR b kq - 0 12"
+    # board9 = test_position(fen9, "h4d4")  # Queen takes pawn
 
-
-    # Test numba speed
 
     board = chess.Board(fen1)
     score = Score()
-    score.initialize_scores(board1)
+    score.initialize(board1)
 
-    # _ = score._calculate_score(0, 0, 0, 0, 0)
+    _ = score.calculate()
 
     start_time = default_timer()
 
-    for i in range(1_000_000):
+    n = 1_000_000
+    for i in range(n):
         new_score = score.updated(board, chess.Move.from_uci("b5c7"))
         calculated = new_score.calculate()
+        # calculated = score.numpy_calculate(board)
         if i % 100_000 == 0:
             print(f"Score after {i} moves: {calculated}")
 
     time_taken = default_timer() - start_time
 
-    print(f"Time taken for 1,000,000 moves: {time_taken:.2f} seconds")
-    print(f"Time per move: {time_taken / 1_000_000 * 1_000:.4f} ms")
+    print(f"Time taken for {n} moves: {time_taken:.2f} seconds")
+    print(f"Time per move: {time_taken / n * 1_000:.4f} ms")
