@@ -70,8 +70,8 @@ GameStage: TypeAlias = bool
 MIDGAME: GameStage = False
 ENDGAME: GameStage = True
 
-# TODO Autotune these values
-# Piece square tables from Rofchade
+# TODO Auto-tune these values
+# Piece square tables from Rofchade (http://www.talkchess.com/forum3/viewtopic.php?f=2&t=68311&start=19)
 mg_pawn_table = np.array([
       0,   0,   0,   0,   0,   0,  0,   0,
      98, 134,  61,  95,  68, 126, 34, -11,
@@ -204,17 +204,20 @@ eg_king_table = np.array([
     -53, -34, -21, -11, -28, -14, -24, -43
 ], dtype=np.int16)
 
+# Flips a square (e.g. a1 -> a8)
+FLIP = lambda sq: sq ^ 56
+
 # Flip piece square tables for white (PSQT[game_stage][piece_type][FLIP[square]])
-FLIP = np.array([
-    56, 57, 58, 59, 60, 61, 62, 63,
-    48, 49, 50, 51, 52, 53, 54, 55,
-    40, 41, 42, 43, 44, 45, 46, 47,
-    32, 33, 34, 35, 36, 37, 38, 39,
-    24, 25, 26, 27, 28, 29, 30, 31,
-    16, 17, 18, 19, 20, 21, 22, 23,
-     8,  9, 10, 11, 12, 13, 14, 15,
-     0,  1,  2,  3,  4,  5,  6,  7,
-], dtype=np.int16)
+# FLIP = np.array([
+#     56, 57, 58, 59, 60, 61, 62, 63,
+#     48, 49, 50, 51, 52, 53, 54, 55,
+#     40, 41, 42, 43, 44, 45, 46, 47,
+#     32, 33, 34, 35, 36, 37, 38, 39,
+#     24, 25, 26, 27, 28, 29, 30, 31,
+#     16, 17, 18, 19, 20, 21, 22, 23,
+#      8,  9, 10, 11, 12, 13, 14, 15,
+#      0,  1,  2,  3,  4,  5,  6,  7,
+# ], dtype=np.int16)
 
 PSQT: list[list[Optional[NDArray[np.int16]]]] = [ # Using a list instead of a dict for less overhead (PSQT[MIDGAME/ENDGAME][piece_type][square])
     [

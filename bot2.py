@@ -44,6 +44,7 @@ class TTEntry:
 class Score: # Positive values favor white, negative values favor black
     __slots__ = ["material", "mg", "eg", "npm", "pawn_struct", "king_safety"] # Optimization for faster lookups
 
+    # ? Slowish
     def __init__(self, material: np.int16 = np.int16(0), mg: np.int16 = np.int16(0), eg: np.int16 = np.int16(0), npm: np.uint16 = np.uint16(0), pawn_struct: np.int8 = np.int8(0), king_safety: np.int8 = np.int8(0)) -> None:
         """
         Initialize the score with given values.
@@ -125,22 +126,17 @@ class Score: # Positive values favor white, negative values favor black
         Evaluates piece positions using PSQT with interpolation between middlegame and endgame.
         Runs only once so not optimized for clarity.
         """
-        self.material = np.int16(0)
-        self.mg = np.int16(0)
-        self.eg = np.int16(0)
-        self.npm = np.uint16(0)
-        self.pawn_struct = np.int8(0)  # Pawn structure score TODO: Check for overflow
-        self.king_safety = np.int8(0)  # King safety score
+        material, mg, eg, npm, pawn_struct, king_safety = 0, 0, 0, 0, 0, 0
 
         white_bishop_count = 0
         black_bishop_count = 0
 
         # Cache tables for faster lookups
-        piece_values = PIECE_VALUES_STOCKFISH
-        mg_tables = PSQT[MIDGAME]
-        eg_tables = PSQT[ENDGAME]
-        flip = FLIP
-        bishop_bonus = BISHOP_PAIR_BONUS
+        _piece_values = PIECE_VALUES_STOCKFISH
+        _mg_tables = PSQT[MIDGAME]
+        _eg_tables = PSQT[ENDGAME]
+        _flip = FLIP
+        _bishop_bonus = BISHOP_PAIR_BONUS
 
         # Evaluate each piece type
         for square in chess.SQUARES:
@@ -150,27 +146,27 @@ class Score: # Positive values favor white, negative values favor black
 
                 # Update npm score
                 if piece_type != chess.PAWN and piece_type != chess.KING:
-                    self.npm += piece_values[piece_type]
+                    npm += _piece_values[piece_type]
 
                 # Update material and position scores
                 if piece_color: # White piece
-                    self.material += piece_values[piece_type]
-                    self.mg += mg_tables[piece_type][flip[square]] # type: ignore
-                    self.eg += eg_tables[piece_type][flip[square]] # type: ignore
+                    material += _piece_values[piece_type]
+                    mg += _mg_tables[piece_type][_flip(square)] # type: ignore
+                    eg += _eg_tables[piece_type][_flip(square)] # type: ignore
                     if piece_type == chess.BISHOP:
                         white_bishop_count += 1
                 else: # Black piece
-                    self.material -= piece_values[piece_type]
-                    self.mg -= mg_tables[piece_type][square] # type: ignore
-                    self.eg -= eg_tables[piece_type][square] # type: ignore
+                    material -= _piece_values[piece_type]
+                    mg -= _mg_tables[piece_type][square] # type: ignore
+                    eg -= _eg_tables[piece_type][square] # type: ignore
                     if piece_type == chess.BISHOP:
                         black_bishop_count += 1
 
         # Bishop pair bonus worth half a pawn
         if white_bishop_count >= 2:
-            self.material += bishop_bonus
+            material += _bishop_bonus
         if black_bishop_count >= 2:
-            self.material -= bishop_bonus
+            material -= _bishop_bonus
 
 
         # Pawn structure
@@ -195,17 +191,19 @@ class Score: # Positive values favor white, negative values favor black
 
             # Check for isolated pawns (no pawns in adjacent files)
             if white_pawns_in_file > 0 and chess.popcount(white_pawns & adjacent_mask) == 0:
-                self.pawn_struct -= 20  # Isolated white pawn penalty
+                pawn_struct -= 20  # Isolated white pawn penalty
             if black_pawns_in_file > 0 and chess.popcount(black_pawns & adjacent_mask) == 0:
-                self.pawn_struct += 20  # Isolated black pawn penalty
+                pawn_struct += 20  # Isolated black pawn penalty
 
             # Check for doubled pawns
             if white_pawns_in_file > 1:
-                self.pawn_struct -= 10  # Doubled white pawn penalty
+                pawn_struct -= 10  # Doubled white pawn penalty
             if black_pawns_in_file > 1:
-                self.pawn_struct += 10  # Doubled black pawn penalty
+                pawn_struct += 10  # Doubled black pawn penalty
 
-    def updated(self, board: chess.Board, move: chess.Move) -> "Score":
+        self.material, self.mg, self.eg, self.npm, self.pawn_struct, self.king_safety = np.int16(material), np.int16(mg), np.int16(eg), np.uint16(npm), np.int8(pawn_struct), np.int8(king_safety)
+
+    def updated(self, board: chess.Board, move: chess.Move) -> "Score": # TODO: Remove material since it is redundant with mg and eg
         """
         Returns the updated material, midgame, endgame, and non-pawn material scores based on the move.
         Much faster than re-evaluating the entire board, even if only the leaf nodes are re-evaluated.
@@ -221,19 +219,19 @@ class Score: # Positive values favor white, negative values favor black
 
         piece_type = board.piece_type_at(from_square) # ? Expensivish
         piece_color = board.turn
-        color_multiplier = 1 if piece_color else -1
+        color_multiplier = 1 if piece_color else -1 # 1 for white, -1 for black
 
         # Cache tables for faster lookups
-        piece_values: dict[int, int] = PIECE_VALUES_STOCKFISH
-        mg_tables: list[Optional[np.ndarray]] = PSQT[MIDGAME]
-        eg_tables: list[Optional[np.ndarray]] = PSQT[ENDGAME]
-        flip = FLIP # TODO: Check squares are correctly flipped
+        _piece_values: dict[int, int] = PIECE_VALUES_STOCKFISH
+        _mg_tables: list[Optional[np.ndarray]] = PSQT[MIDGAME]
+        _eg_tables: list[Optional[np.ndarray]] = PSQT[ENDGAME]
+        _flip = FLIP # TODO: Check squares are correctly flipped
         
         castling = False
         if piece_type == chess.PAWN: # Update pawn structure if moving a pawn
             pawns_before = board.pieces_mask(chess.PAWN, piece_color)
             pawns_after = pawns_before & ~(1 << from_square) # Remove moved pawn from pawns
-            if promotion_piece_type: # If we are promoting, then we need to account for the dissapearance of the pawn
+            if promotion_piece_type: # If we are promoting, then we need to account for the disappearance of the pawn
                 file_masks = chess.BB_FILES
                 file = from_square & 7
 
@@ -315,21 +313,20 @@ class Score: # Positive values favor white, negative values favor black
             castle_info = CASTLING_UPDATES.get((from_square, to_square, piece_color))
             if castle_info:
                 castling = True
-                mg_rook_table = mg_tables[chess.ROOK]
-                eg_rook_table = eg_tables[chess.ROOK]
+                mg_rook_table = _mg_tables[chess.ROOK]
+                eg_rook_table = _eg_tables[chess.ROOK]
 
                 rook_from, rook_to = castle_info
                 if piece_color: # Flip rook square for white
-                    rook_from, rook_to = flip[rook_from], flip[rook_to]
+                    rook_from, rook_to = _flip(rook_from), _flip(rook_to)
 
                 mg += color_multiplier * (mg_rook_table[rook_to] - mg_rook_table[rook_from]) # type: ignore
                 eg += color_multiplier * (eg_rook_table[rook_to] - eg_rook_table[rook_from]) # type: ignore
 
-
-        # Flip squares for white
+        
         new_from_square, new_to_square = from_square, to_square
-        if piece_color:
-            new_from_square, new_to_square = flip[from_square], flip[to_square]
+        if piece_color: # Flip squares for white
+            new_from_square, new_to_square = _flip(from_square), _flip(to_square)
 
         # Update position scores for moving piece
         if promotion_piece_type: # Promotion
@@ -339,13 +336,13 @@ class Score: # Positive values favor white, negative values favor black
                 if bishop_count_before == 1: # If 2 bishops now, add bonus
                     material += color_multiplier * BISHOP_PAIR_BONUS
 
-            npm += piece_values[promotion_piece_type]
-            material += color_multiplier * (piece_values[promotion_piece_type] - piece_values[chess.PAWN])
-            mg += color_multiplier * (mg_tables[promotion_piece_type][new_to_square] - mg_tables[chess.PAWN][new_from_square]) # type: ignore
-            eg += color_multiplier * (eg_tables[promotion_piece_type][new_to_square] - eg_tables[chess.PAWN][new_from_square]) # type: ignore
+            npm += _piece_values[promotion_piece_type]
+            material += color_multiplier * (_piece_values[promotion_piece_type] - _piece_values[chess.PAWN])
+            mg += color_multiplier * (_mg_tables[promotion_piece_type][new_to_square] - _mg_tables[chess.PAWN][new_from_square]) # type: ignore
+            eg += color_multiplier * (_eg_tables[promotion_piece_type][new_to_square] - _eg_tables[chess.PAWN][new_from_square]) # type: ignore
         else: # Normal move
-            mg_table = mg_tables[piece_type] # type: ignore
-            eg_table = eg_tables[piece_type] # type: ignore
+            mg_table = _mg_tables[piece_type] # type: ignore
+            eg_table = _eg_tables[piece_type] # type: ignore
             mg += color_multiplier * (mg_table[new_to_square] - mg_table[new_from_square]) # ? Expensive
             eg += color_multiplier * (eg_table[new_to_square] - eg_table[new_from_square]) # ? Expensive (less)
 
@@ -356,7 +353,7 @@ class Score: # Positive values favor white, negative values favor black
         # Handle captures
         captured_piece_type = board.piece_type_at(to_square) # ? Expensivish
 
-        # Get en passant capture piece if applicable
+        # Get en passant captured piece if applicable
         if not captured_piece_type and piece_type == chess.PAWN and board.is_en_passant(move):
             to_square -= color_multiplier * 8
             captured_piece_type = board.piece_type_at(from_square)
@@ -386,19 +383,19 @@ class Score: # Positive values favor white, negative values favor black
 
             else: # Capturing a piece other than a pawn
                 # Update npm score
-                npm -= piece_values[captured_piece_type]
+                npm -= _piece_values[captured_piece_type]
 
                 # Update bishop pair bonus if bishop captured
                 if captured_piece_type == chess.BISHOP and board.pieces_mask(captured_piece_type, not piece_color).bit_count() == 2:
                     material -= -color_multiplier * BISHOP_PAIR_BONUS # If 2 bishops before, remove bonus
 
-            if not piece_color: # Flip squares for white
-                to_square = flip[to_square]
+            if not piece_color: # Flip to square if black capturing white
+                to_square = _flip(to_square)
 
             # Remove captured piece from material and position scores
-            material -= -color_multiplier * piece_values[captured_piece_type]
-            mg -= -color_multiplier * mg_tables[captured_piece_type][to_square] # type: ignore
-            eg -= -color_multiplier * eg_tables[captured_piece_type][to_square] # type: ignore
+            material -= -color_multiplier * _piece_values[captured_piece_type]
+            mg -= -color_multiplier * _mg_tables[captured_piece_type][to_square] # type: ignore
+            eg -= -color_multiplier * _eg_tables[captured_piece_type][to_square] # type: ignore
 
         return Score(material, mg, eg, npm, pawn_struct, king_safety) # ? Expensive
 
@@ -428,7 +425,7 @@ class ChessBot:
             return tt_entry.value
 
         # Check expensive operations once
-        if has_legal_moves: # TODO: Use pseduo legal and only push forward if legal?
+        if has_legal_moves: # TODO: Use pseudo legal and only push forward if legal?
             has_legal_moves = any(board.legal_moves) # ! REALLY SLOW
 
         # Evaluate game-ending conditions
@@ -492,6 +489,7 @@ class ChessBot:
                 ordered_moves.append((move, score))
 
         ordered_moves.sort(key=lambda x: x[1], reverse=True)
+        # print(len(ordered_moves)) if len(ordered_moves) > 30 else None
 
         for move_and_score in ordered_moves:
             yield move_and_score[0]
@@ -599,7 +597,7 @@ class ChessBot:
         """
         ordered_moves = list(self.ordered_moves_generator(board, None))
         subtree_count = len(ordered_moves)
-        color_multipier = 1 if maximizing_player else -1
+        color_multiplier = 1 if maximizing_player else -1
 
         original_score = self.game.score
         better_count = 0
@@ -607,7 +605,7 @@ class ChessBot:
         best_move = None
         best_value = None
         while beta - alpha >= 2 and better_count != 1:
-            seperation_value = self.next_guess(alpha, beta, subtree_count)
+            separation_value = self.next_guess(alpha, beta, subtree_count)
 
             better_count = 0
             better = []
@@ -619,10 +617,10 @@ class ChessBot:
                 score = original_score.updated(board, move)
 
                 board.push(move) # TODO -(sep_value+1)
-                move_value = self.alpha_beta(board, DEPTH - 1, -(seperation_value), -(seperation_value-1), not maximizing_player, score)[0]
+                move_value = self.alpha_beta(board, DEPTH - 1, -(separation_value), -(separation_value-1), not maximizing_player, score)[0]
                 board.pop()
 
-                if color_multipier * move_value >= seperation_value:
+                if color_multiplier * move_value >= separation_value:
                     better_count += 1
                     better.append(move)
                     best_move = move
@@ -630,14 +628,14 @@ class ChessBot:
 
             # Update alpha-beta range
             if better_count > 1:
-                alpha = seperation_value
+                alpha = separation_value
 
-                # # Update number of sub-trees that exceeds seperation test value
+                # # Update number of sub-trees that exceeds separation test value
                 if subtree_count != better_count:
                     subtree_count = better_count
                     ordered_moves = better
             else:
-                beta = seperation_value
+                beta = separation_value
 
         return best_value, best_move
 
