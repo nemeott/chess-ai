@@ -191,15 +191,15 @@ class Score: # Positive values favor white, negative values favor black
 
             # Check for isolated pawns (no pawns in adjacent files)
             if white_pawns_in_file > 0 and chess.popcount(white_pawns & adjacent_mask) == 0:
-                pawn_struct -= 2 # Isolated white pawn penalty
+                pawn_struct -= 20 # Isolated white pawn penalty
             if black_pawns_in_file > 0 and chess.popcount(black_pawns & adjacent_mask) == 0:
-                pawn_struct += 2 # Isolated black pawn penalty
+                pawn_struct += 20 # Isolated black pawn penalty
 
             # Check for doubled pawns
             if white_pawns_in_file > 1:
-                pawn_struct -= 1 # Doubled white pawn penalty
+                pawn_struct -= 10 # Doubled white pawn penalty
             if black_pawns_in_file > 1:
-                pawn_struct += 1 # Doubled black pawn penalty
+                pawn_struct += 10 # Doubled black pawn penalty
 
         self.material, self.mg, self.eg, self.npm, self.pawn_struct, self.king_safety = np.int16(material), np.int16(mg), np.int16(eg), np.uint16(npm), np.int8(pawn_struct), np.int8(king_safety)
 
@@ -247,10 +247,10 @@ class Score: # Positive values favor white, negative values favor black
 
                     # Check if left file is now isolated
                     if left_pawns >= 1 and (_popcount(pawns_after & file_masks[file - 2]) if file > 1 else 0) == 0:
-                        pawn_struct -= color_multiplier * 2 # Add penalty for isolated left file
+                        pawn_struct -= color_multiplier * 20 # Add penalty for isolated left file
                     # Check if right file is now isolated
                     if right_pawns >= 1 and (_popcount(pawns_after & file_masks[file + 2]) if file < 6 else 0) == 0:
-                        pawn_struct -= color_multiplier * 2 # Add penalty for isolated right file
+                        pawn_struct -= color_multiplier * 20 # Add penalty for isolated right file
 
             else:  # Not promoting
                 pawns_after |= 1 << to_square # Add moved pawn to pawns
