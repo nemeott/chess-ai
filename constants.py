@@ -22,17 +22,17 @@ IS_BOT: bool = True  # Set to False for human vs bot, True for bot vs bot
 LAST_MOVE_ARROW: bool = True  # Set to True to display last move arrow
 TT_SIZE: np.int8 = np.int8(64) # Size of the transposition table (in MB)
 
+# Search settings
+DEPTH: np.int8 = np.int8(5)  # Search depth for the minimax algorithm
+
 # Debug settings
 CHECKING_MOVE_ARROW: bool = False  # Set to True to display checking move arrow (switches the mode to svg rendering)
 UPDATE_DELAY_MS: np.int8 = np.int8(30)  # Delay between visual updates in milliseconds
 RENDER_DEPTH: np.int8 = np.int8(5) # Depth to render checking moves (set to DEPTH to render root moves)
 
 BREAK_TURN: Optional[np.int8] = None # Number of turns to break after (for debugging)
-# BREAK_TURN: np.int8 = 5 # Number of turns to break after (for debugging)
+# BREAK_TURN: Optional[np.int8] = np.int8(5) # Number of turns to break after (for debugging)
 
-# Search settings
-DEPTH: np.int8 = np.int8(5)  # Search depth for the minimax algorithm
-# RENDER_DEPTH: np.int8 = 0 # Depth to render checking moves (set to DEPTH to render root moves)
 
 
 '''

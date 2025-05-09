@@ -1,32 +1,31 @@
 import chess
-# from board import ChessBoard
-from chess.polyglot import zobrist_hash # Built-in Zobrist hashing  TODO implement incremental hashing
+# from chess.polyglot import zobrist_hash # Built-in Zobrist hashing  TODO implement incremental hashing
 
-from dataclasses import dataclass  # For TT entries and scores
-from numpy._typing._array_like import NDArray # type: ignore
-from typing_extensions import TypeAlias  # For flags
+from dataclasses import dataclass
 import numpy as np
+
+from typing_extensions import TypeAlias # For flags
 from typing import Generator, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
-    from game import ChessGame  # Only import while type checking
+    from game import ChessGame # Only import while type checking
 
-from lru import LRU  # For TT and history tables
-from sys import getsizeof # For memory usage
+from lru import LRU # For TT and history tables
+from sys import getsizeof # For memory usage calculations
 
 from constants import DEPTH, MAX_VALUE, MIN_VALUE, CHECKING_MOVE_ARROW, RENDER_DEPTH, TT_SIZE, \
     PIECE_VALUES_STOCKFISH, BISHOP_PAIR_BONUS, FLIP, MIDGAME, ENDGAME, PSQT, CASTLING_UPDATES, NPM_SCALAR
 
-import colors  # Debug log colors
-from timeit import default_timer # For debugging timing
+import colors # Debug log colors
+from timeit import default_timer # For debug timing
 
-from numba import jit, njit, vectorize
+from numba import jit # (njit not needed since default is nopython since numba 0.59.0)
 
 
 # Transposition table entry flags
 Flag: TypeAlias = np.int8
 EXACT: Flag = np.int8(1)
-LOWERBOUND: Flag = np.int8(2)  # Beta (fail-high)
-UPPERBOUND: Flag = np.int8(3)  # Alpha (fail-low)
+LOWERBOUND: Flag = np.int8(2) # Beta (fail-high)
+UPPERBOUND: Flag = np.int8(3) # Alpha (fail-low)
 
 # Transposition table entry
 @dataclass
@@ -44,7 +43,7 @@ class TTEntry:
 class Score: # Positive values favor white, negative values favor black
     __slots__ = ["material", "mg", "eg", "npm", "pawn_struct", "king_safety"] # Optimization for faster lookups
 
-    # ? Slowish
+    # TODO: Reduce copies of Score objects
     def __init__(self, material: np.int16 = np.int16(0), mg: np.int16 = np.int16(0), eg: np.int16 = np.int16(0), npm: np.uint16 = np.uint16(0), pawn_struct: np.int8 = np.int8(0), king_safety: np.int8 = np.int8(0)) -> None:
         """
         Initialize the score with given values.
@@ -57,19 +56,19 @@ class Score: # Positive values favor white, negative values favor black
         self.king_safety: np.int8 = king_safety # King safety score
 
     @staticmethod
-    @njit(cache=True)
+    @jit(cache=True, fastmath=True)
     def _numba_calculate(material, mg, eg, npm, pawn_struct, king_safety) -> np.int16:
         # Phase value between 0 and 256 (0 = endgame, 256 = opening)
         phase = min(npm // NPM_SCALAR, 256)
         # assert 0 <= phase <= 256, f"Phase value out of bounds: {phase}"
 
         # Interpolate between midgame and endgame scores
-        interpolated_mg_eg_score: int = ((int(mg) * phase) + (int(eg) * (256 - phase))) >> 8 
+        interpolated_mg_eg_score: int = ((mg * phase) + (eg * (256 - phase))) >> 8 
 
         # Interpolate the pawn structure score (more important in endgame)
-        interpolated_pawn_struct: int = (int(pawn_struct) * (256 - phase)) >> 8
+        interpolated_pawn_struct: int = (pawn_struct * (256 - phase)) >> 8
 
-        return material + interpolated_mg_eg_score + interpolated_pawn_struct
+        return np.int16(material + interpolated_mg_eg_score + interpolated_pawn_struct)
 
     def calculate(self) -> np.int16:
         """
@@ -122,8 +121,9 @@ class Score: # Positive values favor white, negative values favor black
     def initialize(self, board: chess.Board) -> None:
         """
         Initialize values for starting position (works with custom starting FENs).
-        Calculates material score, npm score, and evaluates piece positions.
+        Calculates material score, npm score, evaluates piece positions, and evaluates pawn structure.
         Evaluates piece positions using PSQT with interpolation between middlegame and endgame.
+        Evaluates pawn structure using isolated and doubled pawns.
         Runs only once so not optimized for clarity.
         """
         material, mg, eg, npm, pawn_struct, king_safety = 0, 0, 0, 0, 0, 0
@@ -191,15 +191,15 @@ class Score: # Positive values favor white, negative values favor black
 
             # Check for isolated pawns (no pawns in adjacent files)
             if white_pawns_in_file > 0 and chess.popcount(white_pawns & adjacent_mask) == 0:
-                pawn_struct -= 20  # Isolated white pawn penalty
+                pawn_struct -= 2 # Isolated white pawn penalty
             if black_pawns_in_file > 0 and chess.popcount(black_pawns & adjacent_mask) == 0:
-                pawn_struct += 20  # Isolated black pawn penalty
+                pawn_struct += 2 # Isolated black pawn penalty
 
             # Check for doubled pawns
             if white_pawns_in_file > 1:
-                pawn_struct -= 10  # Doubled white pawn penalty
+                pawn_struct -= 1 # Doubled white pawn penalty
             if black_pawns_in_file > 1:
-                pawn_struct += 10  # Doubled black pawn penalty
+                pawn_struct += 1 # Doubled black pawn penalty
 
         self.material, self.mg, self.eg, self.npm, self.pawn_struct, self.king_safety = np.int16(material), np.int16(mg), np.int16(eg), np.uint16(npm), np.int8(pawn_struct), np.int8(king_safety)
 
@@ -207,7 +207,8 @@ class Score: # Positive values favor white, negative values favor black
         """
         Returns the updated material, midgame, endgame, and non-pawn material scores based on the move.
         Much faster than re-evaluating the entire board, even if only the leaf nodes are re-evaluated.
-        Hard to understand, but worth it for performance.
+        Hard to understand (and to write), but very worth it for performance.
+        Incremental updates are much faster than re-evaluating the entire board.
         """
         _popcount = chess.popcount
 
@@ -246,10 +247,10 @@ class Score: # Positive values favor white, negative values favor black
 
                     # Check if left file is now isolated
                     if left_pawns >= 1 and (_popcount(pawns_after & file_masks[file - 2]) if file > 1 else 0) == 0:
-                        pawn_struct -= color_multiplier * 20  # Add penalty for isolated left file
+                        pawn_struct -= color_multiplier * 2 # Add penalty for isolated left file
                     # Check if right file is now isolated
                     if right_pawns >= 1 and (_popcount(pawns_after & file_masks[file + 2]) if file < 6 else 0) == 0:
-                        pawn_struct -= color_multiplier * 20  # Add penalty for isolated right file
+                        pawn_struct -= color_multiplier * 2 # Add penalty for isolated right file
 
             else:  # Not promoting
                 pawns_after |= 1 << to_square # Add moved pawn to pawns
@@ -416,6 +417,7 @@ class ChessBot:
         self.game.checking_move = move
         self.game.display_board(self.game.last_move)  # Update display
 
+
     def evaluate_position(self, board: chess.Board, score: Score, tt_entry: Optional[TTEntry] = None, has_legal_moves=True) -> np.int16:
         """
         Evaluate the current position.
@@ -425,7 +427,7 @@ class ChessBot:
             return tt_entry.value
 
         # Check expensive operations once
-        if has_legal_moves: # TODO: Use pseudo legal and only push forward if legal?
+        if has_legal_moves:
             has_legal_moves = any(board.legal_moves) # ! REALLY SLOW
 
         # Evaluate game-ending conditions
@@ -433,7 +435,7 @@ class ChessBot:
             if board.is_check():  # Checkmate
                 return MIN_VALUE if board.turn else MAX_VALUE
             return np.int16(0)  # Stalemate
-        elif board.is_insufficient_material(): # (semi-slow) Insufficient material for either side to win
+        elif board.is_insufficient_material(): # ? Semi slow
             return np.int16(0)
         elif board.can_claim_fifty_moves(): # Avoid fifty move rule
             return np.int16(0)
@@ -441,6 +443,7 @@ class ChessBot:
         return score.calculate()
 
     # def quiescence(self, board: chess.Board, alpha, beta, depth):
+
 
     def ordered_moves_generator(self, board: chess.Board, tt_move: Optional[chess.Move]) -> Generator[chess.Move, None, None]:
         """Generate ordered moves for the current position."""
@@ -459,7 +462,7 @@ class ChessBot:
 
         # Sort remaining moves
         ordered_moves = []
-        for move in board.legal_moves:
+        for move in board.legal_moves: # ! REALLY SLOW
             if not tt_move or move != tt_move: # Skip TT move since already yielded
                 score = 0
 
@@ -482,8 +485,7 @@ class ChessBot:
                 # if board.gives_check(move): # Check bonus
                 #     score += 100
 
-                # # Center control bonus
-                # if move.to_square in CENTER_SQUARES:
+                # if move.to_square in CENTER_SQUARES: # Center square bonus
                 #     score += 100
 
                 ordered_moves.append((move, score))
@@ -510,7 +512,7 @@ class ChessBot:
         original_alpha, original_beta = alpha, beta
 
         # Lookup position in transposition table
-        # key = zobrist_hash(board) # ! REALLY SLOW (probably because it is not incremental)
+        # key = zobrist_hash(board) # ! REALLY SLOW (because it is not incremental)
         key = board._transposition_key() # ? Much faster
         tt_entry: Optional[TTEntry] = self.transposition_table.get(key)
 
@@ -536,7 +538,7 @@ class ChessBot:
             best_value = MIN_VALUE
             for move in self.ordered_moves_generator(board, tt_move):
                 self.moves_checked += 1
-                if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH:  # Display the root move
+                if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH: # Display the root move
                     self.display_checking_move_arrow(move)
 
                 updated_score: Score = _score_updated(board, move)
@@ -549,13 +551,13 @@ class ChessBot:
                     best_value, best_move = value, move
                     alpha = np.int16(max(int(alpha), int(best_value))) # Get new alpha
                     if best_value >= beta:
-                        break  # Beta cutoff (fail-high: opponent won't allow this position)
+                        break # Beta cutoff (fail-high: opponent won't allow this position)
 
         else: # Minimizing player
             best_value = MAX_VALUE
             for move in self.ordered_moves_generator(board, tt_move):
                 self.moves_checked += 1
-                if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH:  # Display the root move
+                if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH: # Display the root move
                     self.display_checking_move_arrow(move)
 
                 updated_score: Score = _score_updated(board, move)
@@ -568,7 +570,7 @@ class ChessBot:
                     best_value, best_move = value, move
                     beta = np.int16(min(int(beta), int(best_value))) # Get new beta
                     if best_value <= alpha:
-                        break  # Alpha cutoff (fail-low: other positions are better)
+                        break # Alpha cutoff (fail-low: other positions are better)
 
         if best_move is None: # If no legal moves, evaluate position (best move is None if loop did iterate through legal moves)
             return self.evaluate_position(board, score, tt_entry, has_legal_moves=False), None
@@ -630,7 +632,7 @@ class ChessBot:
             if better_count > 1:
                 alpha = separation_value
 
-                # # Update number of sub-trees that exceeds separation test value
+                # Update number of sub-trees that exceeds separation test value
                 if subtree_count != better_count:
                     subtree_count = better_count
                     ordered_moves = better
@@ -639,6 +641,31 @@ class ChessBot:
 
         return best_value, best_move
 
+
+    def print_stats(self, board: chess.Board, time_taken: float) -> None:
+        # Moves checked over time taken
+        time_per_move = time_taken / self.moves_checked if self.moves_checked > 0 else 0
+        moves_per_second = 1 / time_per_move if time_per_move > 0 else 0
+        print(f"Moves/Time: {colors.BOLD}{colors.get_moves_color(self.moves_checked)}{self.moves_checked:,}{colors.RESET} / "
+              f"{colors.BOLD}{colors.get_move_time_color(time_taken)}{time_taken:.2f}{colors.RESET} s = "
+              f"{colors.BOLD}{colors.CYAN}{time_per_move * 1000:.4f}{colors.RESET} ms/M, "
+              f"{colors.BOLD}{colors.CYAN}{moves_per_second:,.0f}{colors.RESET} M/s")
+
+        # Calculate memory usage more accurately
+        tt_entry_size = getsizeof(TTEntry(np.int8(0), np.int16(0), EXACT, chess.Move.from_uci("e2e4")), 64)
+        transposition_table_entries = len(self.transposition_table)
+        tt_size_mb = transposition_table_entries * tt_entry_size / (1024 * 1024)
+        # eval_size_mb = sum(getsizeof(k) + getsizeof(v) for k, v in list(self.evaluation_cache.items())[:10]) / 10
+        # eval_size_mb = eval_size_mb * len(self.evaluation_cache) / (1024 * 1024)
+
+        # # Print cache statistics
+        print(f"Transposition table: {colors.BOLD}{colors.MAGENTA}{transposition_table_entries:,}{colors.RESET} entries, "
+            f"{colors.BOLD}{colors.CYAN}{tt_size_mb:.4f}{colors.RESET} MB")
+        # print(f"Evaluation cache: {colors.BOLD}{colors.MAGENTA}{len(self.evaluation_cache):,}{colors.RESET} entries, "
+        #       f"{colors.BOLD}{colors.CYAN}{eval_size_mb:.4f}{colors.RESET} MB")
+
+        # Print the FEN
+        print(f"FEN: {board.fen()}")
 
     def get_move(self, board: chess.Board):
         """
@@ -663,7 +690,6 @@ class ChessBot:
 
         print(f"Goal value: {best_value}")
 
-        # assert best_move is not None, "No best move returned" # TODO remove when done testing
         if best_move is None:
             legal_moves = list(board.legal_moves)
             if len(legal_moves) == 1:
@@ -674,31 +700,8 @@ class ChessBot:
 
         self.game.score = self.game.score.updated(board, best_move)
 
-        time_taken = default_timer() - start_time
+        time_taken: float = default_timer() - start_time
 
-        # TODO move print stuff into function
-        # Moves checked over time taken
-        time_per_move = time_taken / self.moves_checked if self.moves_checked > 0 else 0
-        moves_per_second = 1 / time_per_move if time_per_move > 0 else 0
-        print(f"Moves/Time: {colors.BOLD}{colors.get_moves_color(self.moves_checked)}{self.moves_checked:,}{colors.RESET} / "
-              f"{colors.BOLD}{colors.get_move_time_color(time_taken)}{time_taken:.2f}{colors.RESET} s = "
-              f"{colors.BOLD}{colors.CYAN}{time_per_move * 1000:.4f}{colors.RESET} ms/M, "
-              f"{colors.BOLD}{colors.CYAN}{moves_per_second:,.0f}{colors.RESET} M/s")
-
-        # Calculate memory usage more accurately
-        tt_entry_size = getsizeof(TTEntry(np.int8(0), np.int16(0), EXACT, chess.Move.from_uci("e2e4")), 64)
-        transposition_table_entries = len(self.transposition_table)
-        tt_size_mb = transposition_table_entries * tt_entry_size / (1024 * 1024)
-        # eval_size_mb = sum(getsizeof(k) + getsizeof(v) for k, v in list(self.evaluation_cache.items())[:10]) / 10
-        # eval_size_mb = eval_size_mb * len(self.evaluation_cache) / (1024 * 1024)
-
-        # # Print cache statistics
-        print(f"Transposition table: {colors.BOLD}{colors.MAGENTA}{transposition_table_entries:,}{colors.RESET} entries, "
-            f"{colors.BOLD}{colors.CYAN}{tt_size_mb:.4f}{colors.RESET} MB")
-        # print(f"Evaluation cache: {colors.BOLD}{colors.MAGENTA}{len(self.evaluation_cache):,}{colors.RESET} entries, "
-        #       f"{colors.BOLD}{colors.CYAN}{eval_size_mb:.4f}{colors.RESET} MB")
-
-        # Print the FEN
-        print(f"FEN: {board.fen()}")
+        self.print_stats(board, time_taken)
 
         return best_move
