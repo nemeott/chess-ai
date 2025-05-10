@@ -57,6 +57,9 @@ PIECE_VALUES_STOCKFISH: dict[int, int] = {
 
 BISHOP_PAIR_BONUS: int = PIECE_VALUES_STOCKFISH[chess.PAWN] >> 1 # Half the value of a pawn
 
+ISOLATED_PAWN_PENALTY: int = 20 # Penalty for isolated pawns
+DOUBLED_PAWN_PENALTY: int = 10 # Penalty for doubled pawns
+
 # Total npm at start (16604 with stockfish values)
 START_NPM: np.int16 = np.int16(PIECE_VALUES_STOCKFISH[chess.KNIGHT] * 4 + \
     PIECE_VALUES_STOCKFISH[chess.BISHOP] * 4 + \

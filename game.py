@@ -284,7 +284,6 @@ class ChessGame:
         # Warm up numba calculate function (compile)
         _ = Score()
         _ = _.updated(self.board.get_board_state(), chess.Move.from_uci("e2e4"))
-        _ = _.calculate()
         
         while not self.board.is_game_over():
             print(f"Player: {'White' if self.board.get_board_state().turn else 'Black'} - {self.board.get_board_state().fullmove_number}")
