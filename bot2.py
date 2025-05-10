@@ -29,6 +29,7 @@ EXACT: Flag = np.int8(1)
 LOWERBOUND: Flag = np.int8(2) # Beta (fail-high)
 UPPERBOUND: Flag = np.int8(3) # Alpha (fail-low)
 
+
 @dataclass
 class TTEntry:
     """
@@ -42,7 +43,7 @@ class TTEntry:
     flag: Flag
     best_move: Optional[chess.Move]
 
-# TODO: Move to own file
+
 @dataclass
 class Score: # Positive values favor white, negative values favor black
     """
@@ -53,6 +54,7 @@ class Score: # Positive values favor white, negative values favor black
     Initialization is done once for the starting position and for checking if the incremental update is correct.
     Incremental updates are done for each move since it is much more efficient than re-evaluating the entire board (would have to push/pop each move).
     """
+    # TODO: Move to own file
     __slots__ = ["material", "mg", "eg", "npm", "pawn_struct", "king_safety"] # Optimization for faster lookups
 
     def __init__(self, material: np.int16 = np.int16(0), mg: np.int16 = np.int16(0), eg: np.int16 = np.int16(0), npm: np.uint16 = np.uint16(0), pawn_struct: np.int8 = np.int8(0), king_safety: np.int8 = np.int8(0)) -> None:
@@ -79,7 +81,7 @@ class Score: # Positive values favor white, negative values favor black
         phase = min(npm // NPM_SCALAR, 256)
 
         # Interpolate between midgame and endgame scores
-        interpolated_mg_eg_score: int = ((mg * phase) + (eg * (256 - phase))) >> 8 
+        interpolated_mg_eg_score: int = ((mg * phase) + (eg * (256 - phase))) >> 8
 
         # Interpolate the pawn structure score (more important in endgame)
         interpolated_pawn_struct: int = (pawn_struct * (256 - phase)) >> 8
@@ -98,7 +100,7 @@ class Score: # Positive values favor white, negative values favor black
     #     Attempt to use numpy for efficient calculations.
     #     (Definitely didn't work but left in case future optimizations possible)
     #     """
-    #     # Cache tables for faster lookups  
+    #     # Cache tables for faster lookups
     #     mg_tables = PSQT[MIDGAME]
     #     eg_tables = PSQT[ENDGAME]
 
@@ -130,7 +132,6 @@ class Score: # Positive values favor white, negative values favor black
 
     #     return material + (((mg * phase) + (eg * (256 - phase))) >> 8)
 
-
     def initialize(self, board: chess.Board) -> None:
         """
         Initialize values for a position (works with custom starting FENs).
@@ -153,7 +154,7 @@ class Score: # Positive values favor white, negative values favor black
         white_bishop_count = 0
         black_bishop_count = 0
 
-        # Evaluate each piece type
+        # --- Material and Position Scores ---
         for square in chess.SQUARES:
             piece_type = board.piece_type_at(square)
             if piece_type:
@@ -183,8 +184,7 @@ class Score: # Positive values favor white, negative values favor black
         if black_bishop_count >= 2:
             material -= BISHOP_PAIR_BONUS
 
-
-        # Pawn structure
+        # --- Pawn Structure ---
         file_masks = chess.BB_FILES
 
         # Process both colors at once with direct bitboard manipulation
@@ -216,7 +216,8 @@ class Score: # Positive values favor white, negative values favor black
             if black_pawns_in_file > 1:
                 pawn_struct += DOUBLED_PAWN_PENALTY # Doubled black pawn penalty
 
-        self.material, self.mg, self.eg, self.npm, self.pawn_struct, self.king_safety = np.int16(material), np.int16(mg), np.int16(eg), np.uint16(npm), np.int8(pawn_struct), np.int8(king_safety)
+        self.material, self.mg, self.eg, self.npm, self.pawn_struct, self.king_safety = \
+            np.int16(material), np.int16(mg), np.int16(eg), np.uint16(npm), np.int8(pawn_struct), np.int8(king_safety)
 
     def updated(self, board: chess.Board, move: chess.Move) -> "Score": # TODO: Remove material since it is redundant with mg and eg
         """
@@ -249,7 +250,7 @@ class Score: # Positive values favor white, negative values favor black
         piece_color = board.turn
         color_multiplier = 1 if piece_color else -1 # 1 for white, -1 for black
 
-        
+        # --- Pawn Structure ---
         castling = False
         if piece_type == chess.PAWN: # Update pawn structure if moving a pawn
             pawns_before = board.pieces_mask(chess.PAWN, piece_color)
@@ -262,8 +263,8 @@ class Score: # Positive values favor white, negative values favor black
 
                 if pawns_in_file_after == 1: # 2 pawns in file before
                     pawn_struct += color_multiplier * _doubled_pawn_penalty # Remove doubled pawn penalty
-                
-                if pawns_in_file_after == 0:  # No pawns in file after move
+
+                if pawns_in_file_after == 0: # No pawns in file after move
                     left_pawns = _popcount(pawns_after & file_masks[file - 1]) if file > 0 else 0
                     right_pawns = _popcount(pawns_after & file_masks[file + 1]) if file < 7 else 0
 
@@ -306,7 +307,8 @@ class Score: # Positive values favor white, negative values favor black
                     # Left was isolated previously (have left pawns, added a pawn, and no pawns left of left adj)
                     if left_pawns >= 1 and pawns_in_to_file == 1 and (_popcount(pawns_after & file_masks[to_file - 2]) if to_file > 1 else 0) == 0:
                         pawn_struct += color_multiplier * _isolated_pawn_penalty # Remove penalty
-                    if pawns_in_file_after == 0 and right_pawns >= 1 and (_popcount(pawns_after & file_masks[file + 2]) if file < 6 else 0) == 0: # Right adj is now isolated
+                    # Right adj is now isolated
+                    if pawns_in_file_after == 0 and right_pawns >= 1 and (_popcount(pawns_after & file_masks[file + 2]) if file < 6 else 0) == 0:
                         pawn_struct -= color_multiplier * _isolated_pawn_penalty # Add penalty
 
                 elif to_file > file: # Move to right file (left, file, to_file, right)
@@ -326,12 +328,14 @@ class Score: # Positive values favor white, negative values favor black
                     if pawns_in_to_file >= 1 and right_pawns == 0 and pawns_in_file_after == 0:
                         pawn_struct -= color_multiplier * _isolated_pawn_penalty # Add penalty
 
-                    if pawns_in_file_after == 0 and left_pawns >= 1 and (_popcount(pawns_after & file_masks[file - 2]) if file > 1 else 0) == 0: # Left adj is now isolated
+                    # Left adj is now isolated
+                    if pawns_in_file_after == 0 and left_pawns >= 1 and (_popcount(pawns_after & file_masks[file - 2]) if file > 1 else 0) == 0:
                         pawn_struct -= color_multiplier * _isolated_pawn_penalty # Add penalty
                     # Right was isolated previously (added a pawn, have right pawns, and no pawns right of right adj)
-                    if right_pawns >= 1 and pawns_in_to_file == 1 and (_popcount(pawns_after & file_masks[to_file + 2]) if to_file < 6 else 0) == 0: # Right adj was isolated
+                    if right_pawns >= 1 and pawns_in_to_file == 1 and (_popcount(pawns_after & file_masks[to_file + 2]) if to_file < 6 else 0) == 0:
                         pawn_struct += color_multiplier * _isolated_pawn_penalty # Remove penalty
 
+        # --- Castling ---
         elif piece_type == chess.KING: # Update rook scores if castling
             castle_info = CASTLING_UPDATES.get((from_square, to_square, piece_color))
             if castle_info:
@@ -346,7 +350,7 @@ class Score: # Positive values favor white, negative values favor black
                 mg += color_multiplier * (mg_rook_table[rook_to] - mg_rook_table[rook_from]) # type: ignore
                 eg += color_multiplier * (eg_rook_table[rook_to] - eg_rook_table[rook_from]) # type: ignore
 
-        
+        # --- Score Updates From Move ---
         new_from_square, new_to_square = from_square, to_square
         if piece_color: # Flip squares for white
             new_from_square, new_to_square = _flip(from_square), _flip(to_square)
@@ -361,8 +365,10 @@ class Score: # Positive values favor white, negative values favor black
 
             npm += _piece_values[promotion_piece_type]
             material += color_multiplier * (_piece_values[promotion_piece_type] - _piece_values[chess.PAWN])
-            mg += color_multiplier * (_mg_tables[promotion_piece_type][new_to_square] - _mg_tables[chess.PAWN][new_from_square]) # type: ignore
-            eg += color_multiplier * (_eg_tables[promotion_piece_type][new_to_square] - _eg_tables[chess.PAWN][new_from_square]) # type: ignore
+            mg += color_multiplier * (_mg_tables[promotion_piece_type][new_to_square] - # type: ignore
+                                      _mg_tables[chess.PAWN][new_from_square]) # type: ignore
+            eg += color_multiplier * (_eg_tables[promotion_piece_type][new_to_square] - # type: ignore
+                                      _eg_tables[chess.PAWN][new_from_square]) # type: ignore
         else: # Normal move
             mg_table = _mg_tables[piece_type] # type: ignore
             eg_table = _eg_tables[piece_type] # type: ignore
@@ -372,8 +378,7 @@ class Score: # Positive values favor white, negative values favor black
         if castling: # Done if castling
             return Score(material, mg, eg, npm, pawn_struct, king_safety)
 
-
-        # Handle captures
+        # --- Capture ---
         captured_piece_type = board.piece_type_at(to_square) # ? Expensivish
 
         # Get en passant captured piece if applicable
@@ -381,8 +386,9 @@ class Score: # Positive values favor white, negative values favor black
             to_square -= color_multiplier * 8
             captured_piece_type = board.piece_type_at(from_square)
 
-        if captured_piece_type: # Capture
-            if captured_piece_type == chess.PAWN: # Capturing a pawn (update pawn structure)
+        if captured_piece_type: # Piece captured
+            # --- Pawn Structure ---
+            if captured_piece_type == chess.PAWN: # Capturing a pawn
                 enemy_pawns_before = board.pieces_mask(chess.PAWN, not piece_color)
                 enemy_pawns_after = enemy_pawns_before & ~(1 << to_square) # Remove captured pawn from enemy pawns
 
@@ -397,13 +403,16 @@ class Score: # Positive values favor white, negative values favor black
                     # Update isolated pawn penalties
                     if left_pawns == 0 and right_pawns == 0: # Pawn isolated previously
                         pawn_struct += -color_multiplier * _isolated_pawn_penalty # Remove penalty
-                    if left_pawns >= 1 and (_popcount(enemy_pawns_after & file_masks[file - 2]) if file > 1 else 0) == 0: # Left adj isolated
+                    # Left adj isolated
+                    if left_pawns >= 1 and (_popcount(enemy_pawns_after & file_masks[file - 2]) if file > 1 else 0) == 0:
                         pawn_struct -= -color_multiplier * _isolated_pawn_penalty # Add penalty
-                    if right_pawns >= 1 and (_popcount(enemy_pawns_after & file_masks[file + 2]) if file < 6 else 0) == 0: # Right adj isolated
+                    # Right adj isolated
+                    if right_pawns >= 1 and (_popcount(enemy_pawns_after & file_masks[file + 2]) if file < 6 else 0) == 0:
                         pawn_struct -= -color_multiplier * 20 # Add penalty
                 elif pawns_in_file_after == 1: # 2 pawns in file before
                     pawn_struct += -color_multiplier * _doubled_pawn_penalty # Remove doubled pawn penalty
 
+            # --- Score Updates From Capture ---
             else: # Capturing a piece other than a pawn
                 # Update npm score
                 npm -= _piece_values[captured_piece_type]
@@ -427,7 +436,7 @@ class ChessBot:
     """
     Class to represent the chess bot.
     """
-    __slots__ = ["game", "moves_checked", "transposition_table"]  # Optimization for fast lookups
+    __slots__ = ["game", "moves_checked", "transposition_table"] # Optimization for fast lookups
 
     def __init__(self, game) -> None:
         """
@@ -439,7 +448,7 @@ class ChessBot:
 
         # Initialize transposition table with size in MB
         tt_entry_size = getsizeof(TTEntry(np.int8(0), np.int16(0), EXACT, chess.Move.from_uci("e2e4")), 64)
-        self.transposition_table = LRU(int(TT_SIZE) * 1024 * 1024 // tt_entry_size)  # Initialize TT with size in MB
+        self.transposition_table = LRU(int(TT_SIZE) * 1024 * 1024 // tt_entry_size) # Initialize TT with size in MB
 
     def display_checking_move_arrow(self, move) -> None:
         """
@@ -447,8 +456,7 @@ class ChessBot:
         Used for debugging purposes.
         """
         self.game.checking_move = move
-        self.game.display_board(self.game.last_move)  # Update display
-
+        self.game.display_board(self.game.last_move) # Update display
 
     def evaluate_position(self, board: chess.Board, score: Score, tt_entry: Optional[TTEntry] = None, has_legal_moves=True) -> np.int16:
         """
@@ -463,10 +471,10 @@ class ChessBot:
             has_legal_moves = any(board.legal_moves) # ! REALLY SLOW
 
         # Evaluate game-ending conditions
-        if not has_legal_moves:  # No legal moves
-            if board.is_check():  # Checkmate
+        if not has_legal_moves: # No legal moves
+            if board.is_check(): # Checkmate
                 return MIN_VALUE if board.turn else MAX_VALUE
-            return np.int16(0)  # Stalemate
+            return np.int16(0) # Stalemate
         elif board.is_insufficient_material(): # ? Semi slow
             return np.int16(0)
         elif board.can_claim_fifty_moves(): # Avoid fifty move rule
@@ -475,7 +483,6 @@ class ChessBot:
         return score.calculate()
 
     # def quiescence(self, board: chess.Board, alpha, beta, depth):
-
 
     def ordered_moves_generator(self, board: chess.Board, tt_move: Optional[chess.Move]) -> Generator[chess.Move, None, None]:
         """
@@ -530,7 +537,6 @@ class ChessBot:
 
         for move_and_score in ordered_moves:
             yield move_and_score[0]
-
 
     def alpha_beta(self, board: chess.Board, depth: np.int8, alpha: np.int16, beta: np.int16, maximizing_player: bool, score: Score) -> tuple[np.int16, Optional[chess.Move]]:
         """
@@ -607,7 +613,7 @@ class ChessBot:
                     if best_value <= alpha:
                         break # Alpha cutoff (fail-low: other positions are better)
 
-        if best_move is None: # If no legal moves, evaluate position (best move is None if loop did iterate through legal moves)
+        if best_move is None: # If no legal moves, evaluate position
             return self.evaluate_position(board, score, tt_entry, has_legal_moves=False), None
 
         # Store position in transposition table
@@ -622,8 +628,8 @@ class ChessBot:
 
         return best_value, best_move
 
-
     # TODO WIP ---------------------------------------------
+
     def next_guess(self, alpha, beta, subtree_count):
         return alpha + (beta - alpha) * (subtree_count - 1) / subtree_count
 
@@ -653,8 +659,13 @@ class ChessBot:
 
                 score = original_score.updated(board, move)
 
-                board.push(move) # TODO -(sep_value+1)
-                move_value = self.alpha_beta(board, DEPTH - 1, -(separation_value), -(separation_value-1), not maximizing_player, score)[0]
+                board.push(move)
+                move_value = self.alpha_beta(board,
+                                             DEPTH - 1,
+                                             -(separation_value), # TODO -(sep_value+1) and other variations
+                                             -(separation_value - 1),
+                                             not maximizing_player,
+                                             score)[0]
                 board.pop()
 
                 if color_multiplier * move_value >= separation_value:
@@ -676,7 +687,6 @@ class ChessBot:
 
         return best_value, best_move
 
-
     def print_stats(self, board: chess.Board, time_taken: float) -> None:
         """
         Print statistics about the search.
@@ -697,9 +707,9 @@ class ChessBot:
         # eval_size_mb = sum(getsizeof(k) + getsizeof(v) for k, v in list(self.evaluation_cache.items())[:10]) / 10
         # eval_size_mb = eval_size_mb * len(self.evaluation_cache) / (1024 * 1024)
 
-        # # Print cache statistics
+        # Print cache statistics
         print(f"Transposition table: {colors.BOLD}{colors.MAGENTA}{transposition_table_entries:,}{colors.RESET} entries, "
-            f"{colors.BOLD}{colors.CYAN}{tt_size_mb:.4f}{colors.RESET} MB")
+              f"{colors.BOLD}{colors.CYAN}{tt_size_mb:.4f}{colors.RESET} MB")
         # print(f"Evaluation cache: {colors.BOLD}{colors.MAGENTA}{len(self.evaluation_cache):,}{colors.RESET} entries, "
         #       f"{colors.BOLD}{colors.CYAN}{eval_size_mb:.4f}{colors.RESET} MB")
 

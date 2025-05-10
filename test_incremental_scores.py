@@ -78,41 +78,41 @@ if __name__ == "__main__":
 
     # Position 1: White to move
     fen1 = "r1b1r1k1/ppp2qbp/6p1/1N1p4/5B2/3p2P1/PPPK1p1P/R4Q1B w - - 0 25"
-    board1 = test_position(fen1, "b5c7")  # Knight captures pawn
+    board1 = test_position(fen1, "b5c7") # Knight captures pawn
 
     # Position 2: Black to move
     fen2 = "r1b1r1k1/ppN2qbp/6p1/3p4/5B2/3p2P1/PPPK1p1P/R4Q1B b - - 0 25"
-    board2 = test_position(fen2, "c8h3")  # Bishop moves to h3
+    board2 = test_position(fen2, "c8h3") # Bishop moves to h3
 
     # Position 3: White to move
     fen3 = "r3r1k1/ppN2qbp/6p1/3p4/5B2/3p2Pb/PPPK1p1P/R4Q1B w - - 1 26"
-    board3 = test_position(fen3, "f1h3")  # Queen captures bishop
+    board3 = test_position(fen3, "f1h3") # Queen captures bishop
 
     # Position 4: Black to move
     # Black iso -> not iso
     # Black doubled -> not doubled
     fen4 = "r3r1k1/ppN2qbp/6p1/3p4/5B2/3p2PQ/PPPK1p1P/R6B b - - 0 26"
-    board4 = test_position(fen4, "d3c2")  # Pawn moves to c2
+    board4 = test_position(fen4, "d3c2") # Pawn moves to c2
 
     # Position 5: White to move
     fen5 = "r3r1k1/ppN2qbp/6p1/3p4/5B2/6PQ/PPpK1p1P/R6B w - - 0 27"
-    board5 = test_position(fen5, "c7a8")  # Knight captures rook
+    board5 = test_position(fen5, "c7a8") # Knight captures rook
 
     # Position 6
     fen6 = "r1bqkb1r/ppp1pppp/2n2n2/3p4/3P4/2N2N2/PPP1PPPP/R1BQKB1R w KQkq - 2 4"
-    board6 = test_position(fen6, "c3d5")  # Pawn captures pawn
+    board6 = test_position(fen6, "c3d5") # Pawn captures pawn
 
     # Position 7: Test promoting a pawn
     fen7 = "8/1pp2p1P/8/1K6/8/5kP1/8/2r5 w - - 1 29"
-    board7 = test_position(fen7, "h7h8q")  # Pawn promotes to queen
+    board7 = test_position(fen7, "h7h8q") # Pawn promotes to queen
 
     # Position 8: Self isolation (covid pawn)
     fen8 = "r1bq1rk1/pp3ppp/2p2n2/4n1N1/1b1p4/4p1N1/PPP1BPPP/R1BQ2KR w - - 0 12"
-    board8 = test_position(fen8, "f2e3")  # Pawn takes pawn
+    board8 = test_position(fen8, "f2e3") # Pawn takes pawn
 
     # Position 9:
     fen9 = "r1b1k2r/pppp1p1p/4p1pB/4P3/3P3q/6P1/PPP2K1P/RN3BNR b kq - 0 12"
-    board9 = test_position(fen9, "h4d4")  # Queen takes pawn
+    board9 = test_position(fen9, "h4d4") # Queen takes pawn
 
 
     board = chess.Board(fen1)

@@ -2,17 +2,18 @@ import chess
 
 from constants import STARTING_FEN
 
+
 class ChessBoard:
     def __init__(self):
         if STARTING_FEN:
             self.board = chess.Board(STARTING_FEN)
         else:
             self.board = chess.Board()
-    
+
     def get_legal_moves(self):
         """Returns a list of legal moves in the current position."""
         return list(self.board.legal_moves)
-    
+
     def make_move(self, move):
         """
         Attempts to make a move on the board.
@@ -25,13 +26,13 @@ class ChessBoard:
             return False
         except:
             return False
-        
+
     def undo_move(self):
         """Undoes the last move made on the board."""
         # Pop if board is not empty
         if self.board.move_stack:
             self.board.pop()
-    
+
     def make_null_move(self):
         """Make a null move by simply pushing a null move to the stack."""
         self.board.push(chess.Move.null())
@@ -43,7 +44,7 @@ class ChessBoard:
     def is_game_over(self):
         """Returns True if the game is over."""
         return self.board.is_game_over()
-    
+
     def get_board_state(self):
         """Returns the current board state."""
         return self.board
@@ -53,4 +54,3 @@ class ChessBoard:
         if self.is_game_over():
             return self.board.outcome()
         return None
-

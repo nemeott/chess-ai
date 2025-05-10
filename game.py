@@ -44,12 +44,12 @@ class ChessGame:
 
                 # Use the default chess.svg colors (tan/brown)
         self.square_colors = {
-            'light': pygame.Color('#f0d9b5'),  # Tan/cream squares (default chess.svg)
-            'dark': pygame.Color('#b58863'),   # Brown squares (default chess.svg)
-            'light_lastmove': pygame.Color('#cdd16a'),  # Highlighted light square for last move
-            'dark_lastmove': pygame.Color('#aaa23b'),   # Highlighted dark square for last move
+            'light': pygame.Color('#f0d9b5'), # Tan/cream squares (default chess.svg)
+            'dark': pygame.Color('#b58863'), # Brown squares (default chess.svg)
+            'light_lastmove': pygame.Color('#cdd16a'), # Highlighted light square for last move
+            'dark_lastmove': pygame.Color('#aaa23b'), # Highlighted dark square for last move
         }
-        self.highlighted_square_color = pygame.Color(255, 255, 0, 128)  # Semi-transparent yellow
+        self.highlighted_square_color = pygame.Color(255, 255, 0, 128) # Semi-transparent yellow
 
         # Initialize Pygame
         pygame.init()
@@ -71,7 +71,7 @@ class ChessGame:
         # Reduce the resolution if it's just for pieces (they'll be scaled anyway)
         png_data = cairosvg.svg2png(
             bytestring=svg_string.encode('utf-8'),
-            output_width=self.WINDOW_SIZE,  # Directly specify final size
+            output_width=self.WINDOW_SIZE, # Directly specify final size
             output_height=self.WINDOW_SIZE
         )
         # Skip resizing step since we specified size in cairosvg
@@ -82,7 +82,7 @@ class ChessGame:
         size = image.size
         data = image.tobytes()
         
-        mode_literal: Literal['P', 'RGB', 'RGBX', 'RGBA', 'ARGB', 'BGRA'] = mode  # type: ignore
+        mode_literal: Literal['P', 'RGB', 'RGBX', 'RGBA', 'ARGB', 'BGRA'] = mode # type: ignore
         return pygame.image.fromstring(data, size, mode_literal)
 
     def create_empty_board(self) -> pygame.Surface:
@@ -180,7 +180,7 @@ class ChessGame:
         hypot = math.hypot(dx, dy)
         
         if hypot == 0:
-            return  # Can't draw an arrow with zero length
+            return # Can't draw an arrow with zero length
         
         # Create semitransparent surface for entire arrow
         arrow_surface = pygame.Surface((self.WINDOW_SIZE, self.WINDOW_SIZE), pygame.SRCALPHA)
@@ -203,12 +203,12 @@ class ChessGame:
             color,
             (xtail, ytail),
             (shaft_x, shaft_y),
-            width=int(square_size * 0.2)  # Match the SVG stroke-width
+            width=int(square_size * 0.2) # Match the SVG stroke-width
         )
         
         # Calculate arrowhead points using SVG algorithm
         marker_points = [
-            (xtip, ytip),  # Tip
+            (xtip, ytip), # Tip
             (shaft_x + dy * 0.5 * marker_size / hypot, shaft_y - dx * 0.5 * marker_size / hypot),
             (shaft_x - dy * 0.5 * marker_size / hypot, shaft_y + dx * 0.5 * marker_size / hypot)
         ]
@@ -248,13 +248,13 @@ class ChessGame:
                 arrows.append(chess.svg.Arrow(
                     last_move.from_square,
                     last_move.to_square,
-                    color="#0000FF"  # Blue color, solid
+                    color="#0000FF" # Blue color, solid
                 ))
             if CHECKING_MOVE_ARROW and self.checking_move:
                 arrows.append(chess.svg.Arrow(
                     self.checking_move.from_square,
                     self.checking_move.to_square,
-                    color="#FF0000"  # Red for checked move, solid
+                    color="#FF0000" # Red for checked move, solid
                 ))
 
             # Create SVG with highlighted last move and selected square
@@ -265,8 +265,8 @@ class ChessGame:
                 arrows=arrows,
                 size=self.WINDOW_SIZE,
                 colors={
-                    "square light": "#f0d9b5",  # Tan/cream
-                    "square dark": "#b58863",   # Brown
+                    "square light": "#f0d9b5", # Tan/cream
+                    "square dark": "#b58863", # Brown
                 }
             )
             

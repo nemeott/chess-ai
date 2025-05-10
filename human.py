@@ -4,7 +4,7 @@ import pygame
 class HumanPlayer:
     def __init__(self, color, game):
         self.color = color
-        self.game = game  # Store reference to game for redrawing
+        self.game = game # Store reference to game for redrawing
         self.selected_square = None
         
     def get_square_from_coords(self, x, y, flipped=False):
@@ -51,7 +51,7 @@ class HumanPlayer:
         button_height = 80
         button_margin = 10
         total_height = (button_height + button_margin) * len(pieces)
-        start_y = (600 - total_height) // 2  # Center vertically in 600x600 window
+        start_y = (600 - total_height) // 2 # Center vertically in 600x600 window
         
         # Create semi-transparent overlay
         overlay = pygame.Surface((600, 600))
@@ -71,14 +71,14 @@ class HumanPlayer:
             data = image.tobytes()
             return pygame.image.fromstring(data, size, mode) # type: ignore
         
-        # Draw buttons and store their rects
+        # Draw buttons and store their rectangles
         buttons = []
         current_y = start_y
         
         for piece_type, piece_name in pieces:
             # Create button rectangle
             button_rect = pygame.Rect(
-                (600 - button_width) // 2,  # Center horizontally
+                (600 - button_width) // 2, # Center horizontally
                 current_y,
                 button_width,
                 button_height
@@ -86,7 +86,7 @@ class HumanPlayer:
             
             # Draw button background
             pygame.draw.rect(screen, (240, 240, 240), button_rect)
-            pygame.draw.rect(screen, (100, 100, 100), button_rect, 2)  # Border
+            pygame.draw.rect(screen, (100, 100, 100), button_rect, 2) # Border
             
             # Generate piece SVG
             piece_svg = chess.svg.piece(chess.Piece(piece_type, self.color), size=button_height-20)
@@ -95,7 +95,7 @@ class HumanPlayer:
             # Calculate positions for piece icon and text
             piece_x = button_rect.left + 20
             piece_y = button_rect.top + 10
-            text_x = piece_x + button_height  # Position text after the piece icon
+            text_x = piece_x + button_height # Position text after the piece icon
             
             # Draw piece icon
             screen.blit(piece_surface, (piece_x, piece_y))
