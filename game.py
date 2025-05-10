@@ -4,14 +4,13 @@ from board import ChessBoard
 from bot2 import ChessBot, Score
 from human import HumanPlayer
 import pygame
-import cairosvg # type: ignore[import-untyped]
+import cairosvg
 import io
 from PIL import Image
 import math # For quick render arrows
-import numpy as np
-from typing import Literal, Union, Optional
+from typing import Literal, Optional
 
-from constants import IS_BOT, NPM_SCALAR, UPDATE_DELAY_MS, LAST_MOVE_ARROW, CHECKING_MOVE_ARROW, BREAK_TURN
+from constants import IS_BOT, UPDATE_DELAY_MS, LAST_MOVE_ARROW, CHECKING_MOVE_ARROW, BREAK_TURN, WHITE_USE_OPENING_BOOK, BLACK_USE_OPENING_BOOK
 
 class ChessGame:
     __slots__ = ["board", "checking_move", "last_move", "last_update_time", "score", "white_player", "black_player", "piece_images", "square_colors", "highlighted_square_color", "WINDOW_SIZE", "screen", "empty_board_surface", "last_board_state"]
@@ -23,18 +22,13 @@ class ChessGame:
         self.last_move: Optional[chess.Move] = None # Last move played
         self.last_update_time: int = pygame.time.get_ticks()
 
-        # Allow either type
-        temp_bot = ChessBot(self)
-        self.white_player: Union[HumanPlayer, ChessBot] = temp_bot # Type hint for white player
-        self.black_player: Union[HumanPlayer, ChessBot] = temp_bot # Type hint for black player
-
         # Initialize players based on IS_BOT flag
         if IS_BOT:
-            self.white_player = ChessBot(self)
-            self.black_player = ChessBot(self)
+            self.white_player = ChessBot(self, WHITE_USE_OPENING_BOOK)
+            self.black_player = ChessBot(self, BLACK_USE_OPENING_BOOK)
         else:
-            self.white_player = HumanPlayer(chess.WHITE, self)
-            self.black_player = ChessBot(self)
+            self.white_player = HumanPlayer(self, chess.WHITE)
+            self.black_player = ChessBot(self, BLACK_USE_OPENING_BOOK)
             
         self.score = Score()
         self.score.initialize(self.board.get_board_state()) # Initialize scores once and update from there

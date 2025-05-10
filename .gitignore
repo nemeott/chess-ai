@@ -5,3 +5,4 @@ venv/
 .ropeproject/
 profile.pyspy
 current_board.svg
+polyglot-collection/

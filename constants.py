@@ -14,18 +14,23 @@ STARTING_FEN: Optional[str] = None
 MAX_VALUE: np.int16 = np.int16(32767) # 2**(16-1) - 1 (max value for 16 bit integer)
 MIN_VALUE: np.int16 = np.int16(-32768) # -2**(16-1) (min value for 16 bit integer)
 
-# CENTER_SQUARES = {chess.D4, chess.D5, chess.E4, chess.E5} # Chess already has this built in
-
-# Game settings
+# --- Game Settings
 IS_BOT: bool = True # Set to False for human vs bot, True for bot vs bot
 # IS_BOT: bool = False # Set to False for human vs bot, True for bot vs bot
 LAST_MOVE_ARROW: bool = True # Set to True to display last move arrow
 TT_SIZE: np.int8 = np.int8(64) # Size of the transposition table (in MB)
 
-# Search settings
+# --- Search Settings ---
 DEPTH: np.int8 = np.int8(5) # Search depth for the minimax algorithm
 
-# Debug settings
+# --- Polyglot Book Settings ---
+# Book from: https://sourceforge.net/projects/codekiddy-chess/files/Books/Polyglot%20books/Update1/
+OPENING_BOOK_PATH: Optional[str] = None # (Polyglot format)
+OPENING_BOOK_PATH: Optional[str] = "polyglot-collection/final-book.bin" # (Polyglot format)
+WHITE_USE_OPENING_BOOK: bool = True
+BLACK_USE_OPENING_BOOK: bool = True
+
+# --- Debug Settings ---
 CHECKING_MOVE_ARROW: bool = False # Set to True to display checking move arrow (switches the mode to svg rendering)
 UPDATE_DELAY_MS: np.int8 = np.int8(30) # Delay between visual updates in milliseconds
 RENDER_DEPTH: np.int8 = np.int8(5) # Depth to render checking moves (set to DEPTH to render root moves)

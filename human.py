@@ -2,9 +2,9 @@ import chess
 import pygame
 
 class HumanPlayer:
-    def __init__(self, color, game):
-        self.color = color
+    def __init__(self, game, color: chess.Color) -> None:
         self.game = game # Store reference to game for redrawing
+        self.color = color
         self.selected_square = None
         
     def get_square_from_coords(self, x, y, flipped=False):

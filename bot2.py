@@ -1,4 +1,5 @@
 import chess
+from chess import polyglot # Polyglot for opening book
 # from chess.polyglot import zobrist_hash # Built-in Zobrist hashing  TODO implement incremental hashing
 
 from dataclasses import dataclass
@@ -13,7 +14,8 @@ from lru import LRU # For TT and history tables
 from sys import getsizeof # For memory usage calculations
 
 from constants import DEPTH, MAX_VALUE, MIN_VALUE, CHECKING_MOVE_ARROW, RENDER_DEPTH, TT_SIZE, PIECE_VALUES_STOCKFISH, \
-    BISHOP_PAIR_BONUS, DOUBLED_PAWN_PENALTY, ISOLATED_PAWN_PENALTY, FLIP, MIDGAME, ENDGAME, PSQT, CASTLING_UPDATES, NPM_SCALAR
+    BISHOP_PAIR_BONUS, DOUBLED_PAWN_PENALTY, ISOLATED_PAWN_PENALTY, FLIP, MIDGAME, ENDGAME, PSQT, CASTLING_UPDATES, NPM_SCALAR, \
+    OPENING_BOOK_PATH
 
 import colors # Debug log colors
 from timeit import default_timer # For debug timing
@@ -436,9 +438,9 @@ class ChessBot:
     """
     Class to represent the chess bot.
     """
-    __slots__ = ["game", "moves_checked", "transposition_table"] # Optimization for fast lookups
+    __slots__ = ["game", "moves_checked", "transposition_table", "opening_book"] # Optimization for fast lookups
 
-    def __init__(self, game) -> None:
+    def __init__(self, game, use_opening_book: bool = True) -> None:
         """
         Initialize the chess bot with the game instance.
         Also initializes the transposition table with size in MB.
@@ -449,6 +451,15 @@ class ChessBot:
         # Initialize transposition table with size in MB
         tt_entry_size = getsizeof(TTEntry(np.int8(0), np.int16(0), EXACT, chess.Move.from_uci("e2e4")), 64)
         self.transposition_table = LRU(int(TT_SIZE) * 1024 * 1024 // tt_entry_size) # Initialize TT with size in MB
+
+        # Initialize opening book
+        self.opening_book = None
+        if use_opening_book and OPENING_BOOK_PATH:
+            try:
+                self.opening_book = polyglot.open_reader(OPENING_BOOK_PATH)
+                print(f"{colors.GREEN}Opening book loaded successfully.{colors.RESET}")
+            except Exception as e:
+                print(f"{colors.RED}Error loading opening book: {e}{colors.RESET}")
 
     def display_checking_move_arrow(self, move) -> None:
         """
@@ -553,25 +564,27 @@ class ChessBot:
         # Lookup position in transposition table
         # key = zobrist_hash(board) # ! REALLY SLOW (because it is not incremental)
         key = board._transposition_key() # ? Much faster
-        tt_entry: Optional[TTEntry] = self.transposition_table.get(key)
+        tt_entry: Optional[TTEntry] = self.transposition_table.get(key) # TODO: Check if actually getting best move
 
         # If position is in transposition table and depth is sufficient
+        tt_move = None
         if tt_entry and tt_entry.depth >= depth:
+            tt_move = tt_entry.best_move
+
             if tt_entry.flag == EXACT:
-                return tt_entry.value, tt_entry.best_move
+                return tt_entry.value, tt_move
             elif tt_entry.flag == LOWERBOUND:
                 alpha = np.int16(max(int(alpha), tt_entry.value))
             elif tt_entry.flag == UPPERBOUND:
                 beta = np.int16(min(int(beta), tt_entry.value))
 
             if alpha >= beta:
-                return tt_entry.value, tt_entry.best_move
+                return tt_entry.value, tt_move
 
         # Terminal node check
         if depth == 0:
             return self.evaluate_position(board, score, tt_entry), None
 
-        tt_move = tt_entry.best_move if tt_entry else None
         best_move = None
         if maximizing_player:
             best_value = np.int16(MIN_VALUE)
@@ -720,34 +733,39 @@ class ChessBot:
         """
         self.moves_checked = 0
 
-        # Run minimax once with manual timing
-        start_time = default_timer()
-
         alpha, beta = MIN_VALUE, MAX_VALUE
 
-        best_value, best_move = self.alpha_beta(
-            board,
-            DEPTH,
-            alpha,
-            beta,
-            board.turn,
-            self.game.score) # type: ignore
+        time_taken: float = 0.0
+        best_move: chess.Move = chess.Move.null()
+        if self.opening_book:
+            book_entry = self.opening_book.get(board) # Get the best book move
+            if book_entry: # Use opening book move
+                best_move = book_entry.move
 
-        # best_value, best_move = self.best_node_search(board, alpha, beta, board.turn)
+        if not best_move: # No book move found, use alpha-beta search
+            start_time: float = default_timer() # Start timer
+            best_value, best_move = self.alpha_beta(
+                board,
+                DEPTH,
+                alpha,
+                beta,
+                board.turn,
+                self.game.score) # type: ignore
+            time_taken = default_timer() - start_time # Stop timer
 
-        print(f"Goal value: {best_value}")
+            # best_value, best_move = self.best_node_search(board, alpha, beta, board.turn)
+
+            print(f"Goal value: {best_value}")
 
         if best_move is None:
             legal_moves = list(board.generate_legal_moves())
-            if len(legal_moves) == 1:
+            if len(legal_moves) > 0:
                 best_move: chess.Move = legal_moves[0]
             else:
                 print(f"{colors.RED}No best move returned{colors.RESET}")
                 print(f"{colors.RED}Legal moves: {legal_moves}{colors.RESET}")
 
         self.game.score = self.game.score.updated(board, best_move)
-
-        time_taken: float = default_timer() - start_time
 
         self.print_stats(board, time_taken)
 
