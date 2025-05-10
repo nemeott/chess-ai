@@ -489,18 +489,18 @@ class ChessBot:
         Generate ordered moves for the current position.
         Uses a simple heuristic to order moves based on piece values and captures.
         """
-        # Cache functions for faster lookups
-        _is_capture = board.is_capture
-        _piece_type_at = board.piece_type_at
-
         # Yield transposition table move first
         if tt_move:
             yield tt_move
 
-        # Cache tables for faster lookups
-        piece_values = PIECE_VALUES_STOCKFISH
+        # Cache functions for faster lookups
+        _is_capture = board.is_capture
+        _piece_type_at = board.piece_type_at
 
-        color_multiplier = 1 if board.turn else -1
+        # Cache table for faster lookups
+        _piece_values = PIECE_VALUES_STOCKFISH
+
+        color_multiplier = 1 if board.turn else -1 # 1 for white, -1 for black
 
         # Sort remaining moves
         ordered_moves = []
@@ -519,15 +519,13 @@ class ChessBot:
                         score += 5 # Small bonus for en passant captures
 
                     # Prioritize capturing higher value pieces using lower value pieces
-                    score += 10_000 + piece_values[victim_piece_type] - piece_values[attacker_piece_type] # type: ignore
+                    score += 10_000 + (_piece_values[victim_piece_type] - # type: ignore
+                                       _piece_values[attacker_piece_type]) # type: ignore
 
                 if move.promotion: # Promotion bonus
-                    score += 1_000 + piece_values[move.promotion] - piece_values[chess.PAWN]
+                    score += 1_000 + _piece_values[move.promotion] - _piece_values[chess.PAWN]
 
-                # if board.gives_check(move): # Check bonus
-                #     score += 100
-
-                # if move.to_square in CENTER_SQUARES: # Center square bonus
+                # if board.gives_check(move): # ! SLOW
                 #     score += 100
 
                 ordered_moves.append((move, score))
@@ -617,7 +615,7 @@ class ChessBot:
             return self.evaluate_position(board, score, tt_entry, has_legal_moves=False), None
 
         # Store position in transposition table
-        if best_value <= original_alpha: # TODO compare with original alpha and beta
+        if best_value <= original_alpha: # TODO: compare with alpha and beta
             flag = UPPERBOUND
         elif best_value >= original_beta:
             flag = LOWERBOUND
