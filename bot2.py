@@ -458,7 +458,7 @@ class ChessBot:
         self.game.checking_move = move
         self.game.display_board(self.game.last_move) # Update display
 
-    def evaluate_position(self, board: chess.Board, score: Score, tt_entry: Optional[TTEntry] = None, has_legal_moves=True) -> np.int16:
+    def evaluate_position(self, board: chess.Board, score: Score, tt_entry: Optional[TTEntry] = None, has_legal_moves: bool = True) -> np.int16:
         """
         Evaluate the current position.
         Positive values favor white, negative values favor black.
@@ -468,14 +468,14 @@ class ChessBot:
 
         # Check expensive operations once
         if has_legal_moves:
-            has_legal_moves = any(board.legal_moves) # ! REALLY SLOW
+            has_legal_moves = any(board.generate_legal_moves()) # ! SLOW
 
         # Evaluate game-ending conditions
         if not has_legal_moves: # No legal moves
             if board.is_check(): # Checkmate
                 return MIN_VALUE if board.turn else MAX_VALUE
             return np.int16(0) # Stalemate
-        elif board.is_insufficient_material(): # ? Semi slow
+        elif board.is_insufficient_material():
             return np.int16(0)
         elif board.can_claim_fifty_moves(): # Avoid fifty move rule
             return np.int16(0)
@@ -504,7 +504,7 @@ class ChessBot:
 
         # Sort remaining moves
         ordered_moves = []
-        for move in board.legal_moves: # ! REALLY SLOW
+        for move in board.generate_legal_moves(): # ! REALLY SLOW
             if not tt_move or move != tt_move: # Skip TT move since already yielded
                 score = 0
 
@@ -574,7 +574,7 @@ class ChessBot:
         tt_move = tt_entry.best_move if tt_entry else None
         best_move = None
         if maximizing_player:
-            best_value = MIN_VALUE
+            best_value = np.int16(MIN_VALUE)
             for move in self.ordered_moves_generator(board, tt_move):
                 self.moves_checked += 1
                 if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH: # Display the root move
@@ -593,7 +593,7 @@ class ChessBot:
                         break # Beta cutoff (fail-high: opponent won't allow this position)
 
         else: # Minimizing player
-            best_value = MAX_VALUE
+            best_value = np.int16(MAX_VALUE)
             for move in self.ordered_moves_generator(board, tt_move):
                 self.moves_checked += 1
                 if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH: # Display the root move
@@ -738,7 +738,7 @@ class ChessBot:
         print(f"Goal value: {best_value}")
 
         if best_move is None:
-            legal_moves = list(board.legal_moves)
+            legal_moves = list(board.generate_legal_moves())
             if len(legal_moves) == 1:
                 best_move: chess.Move = legal_moves[0]
             else:
