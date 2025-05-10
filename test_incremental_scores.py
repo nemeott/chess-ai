@@ -114,6 +114,10 @@ if __name__ == "__main__":
     fen9 = "r1b1k2r/pppp1p1p/4p1pB/4P3/3P3q/6P1/PPP2K1P/RN3BNR b kq - 0 12"
     board9 = test_position(fen9, "h4d4") # Queen takes pawn
 
+    # Position 10:
+    fen10 = "8/8/3kpNp1/4N3/4bKP1/6P1/2p5/3r4 b - - 1 52"
+    board10 = test_position(fen10, "c2c1q") # Pawn promotes to queen
+
 
     board = chess.Board(fen1)
     score = Score()

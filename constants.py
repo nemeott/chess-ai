@@ -18,7 +18,7 @@ MIN_VALUE: np.int16 = np.int16(-32768) # -2**(16-1) (min value for 16 bit intege
 IS_BOT: bool = True # Set to False for human vs bot, True for bot vs bot
 # IS_BOT: bool = False # Set to False for human vs bot, True for bot vs bot
 LAST_MOVE_ARROW: bool = True # Set to True to display last move arrow
-TT_SIZE: np.int8 = np.int8(64) # Size of the transposition table (in MB)
+TT_SIZE: np.int8 = np.int8(32) # Size of the transposition table (in MB)
 
 # --- Search Settings ---
 DEPTH: np.int8 = np.int8(5) # Search depth for the minimax algorithm

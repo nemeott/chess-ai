@@ -270,6 +270,9 @@ class Score: # Positive values favor white, negative values favor black
                     left_pawns = _popcount(pawns_after & file_masks[file - 1]) if file > 0 else 0
                     right_pawns = _popcount(pawns_after & file_masks[file + 1]) if file < 7 else 0
 
+                    # If no longer isolated because of promotion
+                    if left_pawns == 0 and right_pawns == 0:
+                        pawn_struct += color_multiplier * _isolated_pawn_penalty # Remove penalty
                     # Check if left file is now isolated
                     if left_pawns >= 1 and (_popcount(pawns_after & file_masks[file - 2]) if file > 1 else 0) == 0:
                         pawn_struct -= color_multiplier * _isolated_pawn_penalty # Add penalty for isolated left file
@@ -568,7 +571,7 @@ class ChessBot:
 
         # If position is in transposition table and depth is sufficient
         tt_move = None
-        if tt_entry and tt_entry.depth >= depth:
+        if tt_entry and tt_entry.depth >= depth: # TODO: Check vs depth < depth??
             tt_move = tt_entry.best_move
 
             if tt_entry.flag == EXACT:
@@ -583,7 +586,9 @@ class ChessBot:
 
         # Terminal node check
         if depth == 0:
-            return self.evaluate_position(board, score, tt_entry), None
+            value = self.evaluate_position(board, score, tt_entry)
+            # self.transposition_table[key] = TTEntry(depth, value, EXACT, None) # TODO: Test difference with and without
+            return value, None # No move to return
 
         best_move = None
         if maximizing_player:
