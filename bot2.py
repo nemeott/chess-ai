@@ -635,6 +635,7 @@ class ChessBot:
         # Terminal node check
         if depth == 0:
             value = self.evaluate_position(board, score, tt_entry)
+            # self.transposition_table[key] = TTEntry(depth, value, EXACT, None) # ? SLOW
             return value, None # No move to return
             # return self.quiescence(board, 3, alpha, beta, score), None # No move to return
 
@@ -703,7 +704,7 @@ class ChessBot:
 
     # TODO WIP ---------------------------------------------
 
-    def next_guess(self, alpha, beta, subtree_count):
+    def next_guess(self, alpha, beta, subtree_count) -> float:
         return alpha + (beta - alpha) * (subtree_count - 1) / subtree_count
 
     def best_node_search(self, board: chess.Board, alpha, beta, maximizing_player: bool):
@@ -763,17 +764,60 @@ class ChessBot:
 
         return best_value, best_move
     
-    def iterative_deepening_mdt_f(self, board: chess.Board) -> tuple[np.int16, Optional[chess.Move]]:
-        first_guess, best_move = np.int16(0), None
+    def iterative_deepening_mdt_fix(self, board: chess.Board) -> tuple[np.int16, Optional[chess.Move]]:
+        """
+        Iterative deepening driver for MTD(f) search.
+        TODO: Investigate different ways to calculate the initial first guess.
+            An initial guess of 0 results in the best goal value being returned but runs into instability at the end.
+            An initial guess of the current score rarely doesn't return the best goal value, but *does return the best move.
+                *More testing needed to confirm this.
+        """
+        # first_guess, best_move = np.int16(0), None
+        first_guess, best_move = self.game.score.calculate(), None
         for depth in range(1, DEPTH + 1):
-            first_guess, best_move = self.mtd_f(board, first_guess)
+            first_guess, best_move = self.mtd_fix(board, first_guess)
 
         return first_guess, best_move
 
-    def mtd_f(self, board: chess.Board, first_guess) -> tuple[np.int16, Optional[chess.Move]]:
+    def mtd_fix(self, board: chess.Board, first_guess: np.int16) -> tuple[np.int16, Optional[chess.Move]]:
+        """
+        MTD(f) search algorithm enhanced with a fix proposed by Jan-Jaap van Horssen.
+        The algorithm uses a binary search to find the best move.
+        The results are narrowed down, using a null window search.
+        The fix is to revert to the previous best move, if the final value is lower than the guess and the best move has changed.
+        This prevents the algorithm from returning a move that is worse than the previous best move.
+        It also prevents us from having to clear the transposition table after each iteration.
+        """
+        guess = beta = first_guess
+        upper_bound, lower_bound = MAX_VALUE, MIN_VALUE
+
+        prev_best_guess, prev_best_move = None, None
+        best_move = None
+        while lower_bound < upper_bound:
+            prev_best_guess, prev_best_move = guess, best_move
+            
+            beta = max(int(guess), int(lower_bound) + 1)
+            
+            guess, best_move = self.alpha_beta(board, DEPTH, beta - 1, beta, board.turn, self.game.score)
+            if guess < beta:
+                upper_bound = guess 
+            else:
+                lower_bound = guess
+
+        # The fix: if final value is lower than guess and best move changed, revert to previous
+        if guess < beta and best_move != prev_best_move:
+            guess, best_move = prev_best_guess, prev_best_move
+
+        return guess, best_move # type: ignore
+
+    def mtd_f(self, board: chess.Board, first_guess: np.int16) -> tuple[np.int16, Optional[chess.Move]]:
+        """
+        MTD(f) search algorithm.
+        The algorithm uses a binary search to find the best move.
+        The results are narrowed down, using a null window search.
+        """
         guess = first_guess
-        upper_bound = MAX_VALUE
-        lower_bound = MIN_VALUE
+        upper_bound, lower_bound = MAX_VALUE, MIN_VALUE
 
         best_move = None
         while lower_bound < upper_bound:
@@ -807,7 +851,7 @@ class ChessBot:
 
             # best_value, best_move = self.alpha_beta(board, DEPTH, alpha, beta, board.turn, self.game.score)
             # best_value, best_move = self.best_node_search(board, alpha, beta, board.turn)
-            best_value, best_move = self.iterative_deepening_mdt_f(board)
+            best_value, best_move = self.iterative_deepening_mdt_fix(board)
 
             time_taken = default_timer() - start_time # Stop timer
 

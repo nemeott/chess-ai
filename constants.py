@@ -6,13 +6,9 @@ from numpy.typing import NDArray # Add this import at the top of the file if not
 
 # Set to None for standard starting position, or FEN string for custom starting position
 STARTING_FEN: Optional[str] = None
-# STARTING_FEN: str = "2kr1r2/p1p2p1p/4N1p1/1p2B3/5R2/1B4P1/P1P3KP/2q5 b - - 0 26" # Checkmate soon
 
-# STARTING_FEN: str = "r1b1k2r/pppp1p1p/4p1pB/4P3/3q4/6P1/PPP2K1P/RN3BNR w kq - 0 13"
-# STARTING_FEN: str = "r1b1k2r/pppp1p1p/4p1pB/4P3/8/6P1/PqP3KP/RN3BNR w kq - 0 14" # Big jump in evaluation
-
-MAX_VALUE: np.int16 = np.int16(32767) # 2**(16-1) - 1 (max value for 16 bit integer)
-MIN_VALUE: np.int16 = np.int16(-32768) # -2**(16-1) (min value for 16 bit integer)
+MAX_VALUE: np.int16 = np.int16(32767) - 1 # 2**(16-1) - 1 (max value for 16 bit integer)
+MIN_VALUE: np.int16 = np.int16(-32768) + 1 # -2**(16-1) (min value for 16 bit integer)
 
 # --- Game Settings
 IS_BOT: bool = True # Set to False for human vs bot, True for bot vs bot

@@ -273,7 +273,7 @@ class ChessGame:
 
     def play_game(self):
         """Main game loop"""
-        print("-------------------")
+        print("--------------------------------------------------------------")
 
         # Warm up numba calculate function (compile)
         _ = Score()
@@ -326,7 +326,7 @@ class ChessGame:
 
             assert(incremental == actual), f"Score mismatch: {incremental} != {actual}"
 
-            print("-------------------")
+            print("--------------------------------------------------------------")
             self.last_move = move
 
             if BREAK_TURN and self.board.get_board_state().fullmove_number > BREAK_TURN:
@@ -340,12 +340,12 @@ class ChessGame:
         print(f"Game Over! Result: {result}")
 
 
-        while 1:
-            # Process all pending events at once rather than waiting
+        running = True
+        while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    pygame.quit()
-                    return
+                    running = False
+        pygame.quit()
 
 if __name__ == "__main__":
     game = ChessGame()
