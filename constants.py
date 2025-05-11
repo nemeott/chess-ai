@@ -26,7 +26,7 @@ DEPTH: np.int8 = np.int8(5) # Search depth for the minimax algorithm
 # --- Polyglot Book Settings ---
 # Book from: https://sourceforge.net/projects/codekiddy-chess/files/Books/Polyglot%20books/Update1/
 OPENING_BOOK_PATH: Optional[str] = None # (Polyglot format)
-OPENING_BOOK_PATH: Optional[str] = "polyglot-collection/final-book.bin" # (Polyglot format)
+# OPENING_BOOK_PATH: Optional[str] = "polyglot-collection/final-book.bin" # (Polyglot format)
 WHITE_USE_OPENING_BOOK: bool = True
 BLACK_USE_OPENING_BOOK: bool = True
 

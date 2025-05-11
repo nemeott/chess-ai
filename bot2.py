@@ -472,6 +472,11 @@ class ChessBot:
         self.game.checking_move = move
         self.game.display_board(self.game.last_move) # Update display
 
+    def increment_moves_and_render_arrow(self, depth: np.int8, move: chess.Move) -> None:
+        self.moves_checked += 1
+        if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH: # Display the root move
+            self.display_checking_move_arrow(move)
+
     def evaluate_position(self, board: chess.Board, score: Score, tt_entry: Optional[TTEntry] = None, has_legal_moves: bool = True) -> np.int16:
         """
         Evaluate the current position.
@@ -495,8 +500,6 @@ class ChessBot:
             return np.int16(0)
 
         return score.calculate()
-
-    # def quiescence(self, board: chess.Board, alpha, beta, depth):
 
     def ordered_moves_generator(self, board: chess.Board, tt_move: Optional[chess.Move]) -> Generator[chess.Move, None, None]:
         """
@@ -550,7 +553,55 @@ class ChessBot:
         for move_and_score in ordered_moves:
             yield move_and_score[0]
 
-    def alpha_beta(self, board: chess.Board, depth: np.int8, alpha: np.int16, beta: np.int16, maximizing_player: bool, score: Score) -> tuple[np.int16, Optional[chess.Move]]:
+    def quiescence(self, board: chess.Board, depth, alpha, beta, score) -> np.int16:
+        """
+        Quiescence search to avoid horizon effect.
+        Searches only captures until a quiet position is reached.
+        """
+        # self.moves_checked += 1
+
+        # Cache functions for faster lookups
+        _piece_type_at = board.piece_type_at
+        _push = board.push
+        _pop = board.pop
+
+        # Cache table for faster lookups
+        _piece_values = PIECE_VALUES_STOCKFISH
+
+        color_multiplier = 1 if board.turn else -1 # 1 for white, -1 for black
+
+        # Evaluate position (lazy evaluation)
+        stand_pat = score.calculate()
+
+        if stand_pat >= beta: # Beta cutoff
+            return beta # TODO: Test vs returning stand pat
+        if alpha < stand_pat: # Update alpha if stand pat is better
+            alpha = stand_pat
+
+        for move in board.generate_legal_captures():
+            # Skip if capture is not worth it
+            if not move.promotion:
+                victim_piece_type = _piece_type_at(move.to_square)
+                if not victim_piece_type and board.is_en_passant(move):
+                    victim_piece_type = _piece_type_at(move.to_square - (color_multiplier * 8))
+
+                if stand_pat + _piece_values[victim_piece_type] <= alpha: # type: ignore
+                    continue
+
+            updated_score: Score = score.updated(board, move)
+
+            _push(move)
+            value = -self.quiescence(board, depth - 1, -beta, -alpha, updated_score)
+            _pop()
+
+            if value >= beta: # Beta cutoff
+                return beta
+            if value > alpha: # Update alpha if value is better
+                alpha = value
+
+        return alpha # Return the best value found
+
+    def alpha_beta(self, board: chess.Board, depth: np.int8, alpha: float, beta: float, maximizing_player: bool, score: Score, allow_null_move: bool = True) -> tuple[np.int16, Optional[chess.Move]]:
         """
         Fail-soft alpha-beta search with transposition table.
         Scores are incrementally updated based on the move.
@@ -561,6 +612,7 @@ class ChessBot:
         _push = board.push
         _pop = board.pop
         _score_updated = score.updated
+        _increment_moves_and_render_arrow = self.increment_moves_and_render_arrow
 
         original_alpha, original_beta = alpha, beta
 
@@ -573,67 +625,72 @@ class ChessBot:
         tt_move = None
         if tt_entry and tt_entry.depth >= depth: # TODO: Check vs depth < depth??
             tt_move = tt_entry.best_move
-
             if tt_entry.flag == EXACT:
                 return tt_entry.value, tt_move
-            elif tt_entry.flag == LOWERBOUND:
-                alpha = np.int16(max(int(alpha), tt_entry.value))
-            elif tt_entry.flag == UPPERBOUND:
-                beta = np.int16(min(int(beta), tt_entry.value))
-
-            if alpha >= beta:
+            elif tt_entry.flag == LOWERBOUND and tt_entry.value >= beta:
+                return tt_entry.value, tt_move
+            elif tt_entry.flag == UPPERBOUND and tt_entry.value <= alpha:
                 return tt_entry.value, tt_move
 
         # Terminal node check
         if depth == 0:
             value = self.evaluate_position(board, score, tt_entry)
-            # self.transposition_table[key] = TTEntry(depth, value, EXACT, None) # TODO: Test difference with and without
             return value, None # No move to return
+            # return self.quiescence(board, 3, alpha, beta, score), None # No move to return
+
+        # --- Null Move Pruning ---
+        # if allow_null_move and depth >= 3 and not board.is_check(): # Depth sufficient, and not in check
+        #     bitboard: chess.Bitboard = board.occupied_co[board.turn]
+        #     bitboard = bitboard & ~board.pawns & ~board.kings # Remove pawns and kings from bitboard
+        #     if bitboard > 0: # If there are non-pawn pieces
+        #         R = 3 if score.npm < 1_500 else 2 # Reduction factor
+
+        #         _push(chess.Move.null()) # Make null move
+        #         null_value: np.int16 = -self.alpha_beta(board, np.int8(depth - R - 1), -beta, -beta + 1, not maximizing_player, score, False)[0]
+        #         _pop() # Undo null move
+
+        #         # If null move causes beta cutoff, prune this subtree
+        #         if null_value >= beta:
+        #             return null_value, None
 
         best_move = None
         if maximizing_player:
-            best_value = np.int16(MIN_VALUE)
+            best_value: np.int16 = MIN_VALUE
             for move in self.ordered_moves_generator(board, tt_move):
-                self.moves_checked += 1
-                if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH: # Display the root move
-                    self.display_checking_move_arrow(move)
+                _increment_moves_and_render_arrow(depth, move) # Increment moves checked and render arrow
 
                 updated_score: Score = _score_updated(board, move)
-
                 _push(move)
-                value: np.int16 = self.alpha_beta(board, np.int8(depth - 1), alpha, beta, False, updated_score)[0]
+                value: np.int16 = self.alpha_beta(board, depth - 1, alpha, beta, False, updated_score)[0]
                 _pop()
 
                 if value > best_value: # Get new best value and move
                     best_value, best_move = value, move
-                    alpha = np.int16(max(int(alpha), int(best_value))) # Get new alpha
-                    if best_value >= beta:
+                    alpha = max(int(alpha), int(best_value)) # Get new alpha
+                    if alpha >= beta:
                         break # Beta cutoff (fail-high: opponent won't allow this position)
 
         else: # Minimizing player
-            best_value = np.int16(MAX_VALUE)
+            best_value: np.int16 = MAX_VALUE
             for move in self.ordered_moves_generator(board, tt_move):
-                self.moves_checked += 1
-                if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH: # Display the root move
-                    self.display_checking_move_arrow(move)
+                _increment_moves_and_render_arrow(depth, move) # Increment moves checked and render arrow
 
                 updated_score: Score = _score_updated(board, move)
-
                 _push(move)
-                value: np.int16 = self.alpha_beta(board, np.int8(depth - 1), alpha, beta, True, updated_score)[0]
+                value: np.int16 = self.alpha_beta(board, depth - 1, alpha, beta, True, updated_score)[0]
                 _pop()
 
                 if value < best_value: # Get new best value and move
                     best_value, best_move = value, move
-                    beta = np.int16(min(int(beta), int(best_value))) # Get new beta
-                    if best_value <= alpha:
+                    beta = min(int(beta), int(best_value)) # Get new beta
+                    if beta <= alpha:
                         break # Alpha cutoff (fail-low: other positions are better)
 
         if best_move is None: # If no legal moves, evaluate position
             return self.evaluate_position(board, score, tt_entry, has_legal_moves=False), None
 
         # Store position in transposition table
-        if best_value <= original_alpha: # TODO: compare with alpha and beta
+        if best_value <= original_alpha:
             flag = UPPERBOUND
         elif best_value >= original_beta:
             flag = LOWERBOUND
@@ -654,6 +711,8 @@ class ChessBot:
         Experimental best node search (fuzzified game search) algorithm based on the paper by Dmitrijs Rutko.
         Uses the next guess function to return the separation value for the next iteration.
         """
+        alpha, beta = float(alpha), float(beta)
+
         ordered_moves = list(self.ordered_moves_generator(board, None))
         subtree_count = len(ordered_moves)
         color_multiplier = 1 if maximizing_player else -1
@@ -669,12 +728,9 @@ class ChessBot:
             better_count = 0
             better = []
             for move in ordered_moves:
-                self.moves_checked += 1
-                if CHECKING_MOVE_ARROW and DEPTH >= RENDER_DEPTH:
-                    self.display_checking_move_arrow(move)
+                self.increment_moves_and_render_arrow(DEPTH, move)
 
                 score = original_score.updated(board, move)
-
                 board.push(move)
                 move_value = self.alpha_beta(board,
                                              DEPTH - 1,
@@ -684,11 +740,15 @@ class ChessBot:
                                              score)[0]
                 board.pop()
 
-                if color_multiplier * move_value >= separation_value:
+                if color_multiplier * int(move_value) >= separation_value:
                     better_count += 1
                     better.append(move)
                     best_move = move
                     best_value = move_value
+
+                    # expected_quality = 1 / ((better_count / self.moves_checked) * (subtree_count**int(DEPTH)))
+                    # if expected_quality > 0.95:
+                    #     return best_value, best_move
 
             # Update alpha-beta range
             if better_count > 1:
@@ -702,7 +762,72 @@ class ChessBot:
                 beta = separation_value
 
         return best_value, best_move
+    
+    def iterative_deepening_mdt_f(self, board: chess.Board) -> tuple[np.int16, Optional[chess.Move]]:
+        first_guess, best_move = np.int16(0), None
+        for depth in range(1, DEPTH + 1):
+            first_guess, best_move = self.mtd_f(board, first_guess)
 
+        return first_guess, best_move
+
+    def mtd_f(self, board: chess.Board, f) -> tuple[np.int16, Optional[chess.Move]]:
+        g = f
+        upper_bound = MAX_VALUE
+        lower_bound = MIN_VALUE
+
+        best_move = None
+        while lower_bound < upper_bound:
+            beta = max(int(g), int(lower_bound) + 1)
+            
+            g, best_move = self.alpha_beta(board, DEPTH, beta - 1, beta, board.turn, self.game.score)
+            if g < beta:
+                upper_bound = g 
+            else:
+                lower_bound = g
+
+        return g, best_move
+
+    def get_move(self, board: chess.Board):
+        """
+        Main method to get the best move for the current player.
+        """
+        self.moves_checked = 0
+
+        alpha, beta = float(MIN_VALUE), float(MAX_VALUE)
+
+        time_taken: float = 0.0
+        best_move: Optional[chess.Move] = chess.Move.null()
+        if self.opening_book:
+            book_entry = self.opening_book.get(board) # Get the best book move
+            if book_entry: # Use opening book move
+                best_move = book_entry.move
+
+        if not best_move: # No book move found, use alpha-beta search
+            start_time: float = default_timer() # Start timer
+
+            # best_value, best_move = self.alpha_beta(board, DEPTH, alpha, beta, board.turn, self.game.score)
+            # best_value, best_move = self.best_node_search(board, alpha, beta, board.turn)
+            best_value, best_move = self.iterative_deepening_mdt_f(board)
+
+            time_taken = default_timer() - start_time # Stop timer
+
+            print(f"Goal value: {best_value}")
+
+        if best_move is None:
+            legal_moves = list(board.generate_legal_moves())
+            if len(legal_moves) > 0:
+                best_move = legal_moves[0]
+            else:
+                print(f"{colors.RED}No best move returned{colors.RESET}")
+                print(f"{colors.RED}Legal moves: {legal_moves}{colors.RESET}")
+                quit()
+
+        self.game.score = self.game.score.updated(board, best_move) # type: ignore
+
+        self.print_stats(board, time_taken)
+
+        return best_move
+    
     def print_stats(self, board: chess.Board, time_taken: float) -> None:
         """
         Print statistics about the search.
@@ -731,47 +856,3 @@ class ChessBot:
 
         # Print the FEN
         print(f"FEN: {board.fen()}")
-
-    def get_move(self, board: chess.Board):
-        """
-        Main method to get the best move for the current player.
-        """
-        self.moves_checked = 0
-
-        alpha, beta = MIN_VALUE, MAX_VALUE
-
-        time_taken: float = 0.0
-        best_move: chess.Move = chess.Move.null()
-        if self.opening_book:
-            book_entry = self.opening_book.get(board) # Get the best book move
-            if book_entry: # Use opening book move
-                best_move = book_entry.move
-
-        if not best_move: # No book move found, use alpha-beta search
-            start_time: float = default_timer() # Start timer
-            best_value, best_move = self.alpha_beta(
-                board,
-                DEPTH,
-                alpha,
-                beta,
-                board.turn,
-                self.game.score) # type: ignore
-            time_taken = default_timer() - start_time # Stop timer
-
-            # best_value, best_move = self.best_node_search(board, alpha, beta, board.turn)
-
-            print(f"Goal value: {best_value}")
-
-        if best_move is None:
-            legal_moves = list(board.generate_legal_moves())
-            if len(legal_moves) > 0:
-                best_move: chess.Move = legal_moves[0]
-            else:
-                print(f"{colors.RED}No best move returned{colors.RESET}")
-                print(f"{colors.RED}Legal moves: {legal_moves}{colors.RESET}")
-
-        self.game.score = self.game.score.updated(board, best_move)
-
-        self.print_stats(board, time_taken)
-
-        return best_move

@@ -298,7 +298,7 @@ class ChessGame:
             if move is None:
                 print("Game ended by player")
                 break
-                
+
             # Make the move
             if not self.board.make_move(move):
                 print(f"Illegal move attempted: {move}")
