@@ -221,7 +221,7 @@ class Score: # Positive values favor white, negative values favor black
         self.material, self.mg, self.eg, self.npm, self.pawn_struct, self.king_safety = \
             np.int16(material), np.int16(mg), np.int16(eg), np.uint16(npm), np.int8(pawn_struct), np.int8(king_safety)
 
-    def updated(self, board: chess.Board, move: chess.Move) -> "Score": # TODO: Remove material since it is redundant with mg and eg
+    def updated(self, board: chess.Board, move: chess.Move) -> "Score": # TODO: Interpolate between mg and eg material scores
         """
         Returns the updated material, midgame, endgame, non-pawn material, pawn structure, and king safety scores based on the move.
         Much faster than re-evaluating the entire board, even if only the leaf nodes are re-evaluated.
@@ -619,11 +619,11 @@ class ChessBot:
         # Lookup position in transposition table
         # key = zobrist_hash(board) # ! REALLY SLOW (because it is not incremental)
         key = board._transposition_key() # ? Much faster
-        tt_entry: Optional[TTEntry] = self.transposition_table.get(key) # TODO: Check if actually getting best move
+        tt_entry: Optional[TTEntry] = self.transposition_table.get(key)
 
         # If position is in transposition table and depth is sufficient
         tt_move = None
-        if tt_entry and tt_entry.depth >= depth: # TODO: Check vs depth < depth??
+        if tt_entry and tt_entry.depth >= depth:
             tt_move = tt_entry.best_move
             if tt_entry.flag == EXACT:
                 return tt_entry.value, tt_move
@@ -686,7 +686,7 @@ class ChessBot:
                     if beta <= alpha:
                         break # Alpha cutoff (fail-low: other positions are better)
 
-        if best_move is None: # If no legal moves, evaluate position
+        if best_move is None: # If no legal moves (fall-through), evaluate position
             return self.evaluate_position(board, score, tt_entry, has_legal_moves=False), None
 
         # Store position in transposition table
@@ -734,7 +734,7 @@ class ChessBot:
                 board.push(move)
                 move_value = self.alpha_beta(board,
                                              DEPTH - 1,
-                                             -(separation_value), # TODO -(sep_value+1) and other variations
+                                             -(separation_value),
                                              -(separation_value - 1),
                                              not maximizing_player,
                                              score)[0]
@@ -770,22 +770,22 @@ class ChessBot:
 
         return first_guess, best_move
 
-    def mtd_f(self, board: chess.Board, f) -> tuple[np.int16, Optional[chess.Move]]:
-        g = f
+    def mtd_f(self, board: chess.Board, first_guess) -> tuple[np.int16, Optional[chess.Move]]:
+        guess = first_guess
         upper_bound = MAX_VALUE
         lower_bound = MIN_VALUE
 
         best_move = None
         while lower_bound < upper_bound:
-            beta = max(int(g), int(lower_bound) + 1)
+            beta = max(int(guess), int(lower_bound) + 1)
             
-            g, best_move = self.alpha_beta(board, DEPTH, beta - 1, beta, board.turn, self.game.score)
-            if g < beta:
-                upper_bound = g 
+            guess, best_move = self.alpha_beta(board, DEPTH, beta - 1, beta, board.turn, self.game.score)
+            if guess < beta:
+                upper_bound = guess 
             else:
-                lower_bound = g
+                lower_bound = guess
 
-        return g, best_move
+        return guess, best_move
 
     def get_move(self, board: chess.Board):
         """
