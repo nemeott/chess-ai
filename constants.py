@@ -53,18 +53,18 @@ PIECE_VALUES_STOCKFISH: dict[int, int] = {
     chess.KING: 32_000
 } # TODO: Add interpolation between MG: 198, 817, 836, 1_270, 2_521, EG: 258, 846, 857, 1_278, 2_558
 
-BISHOP_PAIR_BONUS: int = PIECE_VALUES_STOCKFISH[chess.PAWN] >> 1 # Half the value of a pawn
+BISHOP_PAIR_BONUS = np.int16(PIECE_VALUES_STOCKFISH[chess.PAWN] >> 1) # Half the value of a pawn
 
-ISOLATED_PAWN_PENALTY: int = 20 # Penalty for isolated pawns
-DOUBLED_PAWN_PENALTY: int = 10 # Penalty for doubled pawns
+ISOLATED_PAWN_PENALTY = np.int8(20) # Penalty for isolated pawns
+DOUBLED_PAWN_PENALTY = np.int8(10) # Penalty for doubled pawns
 
 # Total npm at start (16604 with stockfish values)
-START_NPM: np.int16 = np.int16(PIECE_VALUES_STOCKFISH[chess.KNIGHT] * 4 +
+START_NPM = np.int16(PIECE_VALUES_STOCKFISH[chess.KNIGHT] * 4 +
                                PIECE_VALUES_STOCKFISH[chess.BISHOP] * 4 +
                                PIECE_VALUES_STOCKFISH[chess.ROOK] * 4 +
                                PIECE_VALUES_STOCKFISH[chess.QUEEN] * 2)
 # NPM scalar for evaluation (65 with stockfish values)
-NPM_SCALAR: np.int8 = np.int8((START_NPM // 256) + 1)
+NPM_SCALAR = np.int8((START_NPM // 256) + 1)
 
 # --- Misc Constants ---
 
