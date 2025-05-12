@@ -9,6 +9,9 @@ from typing import Optional
 from constants import PIECE_VALUES_STOCKFISH, BISHOP_PAIR_BONUS, DOUBLED_PAWN_PENALTY, ISOLATED_PAWN_PENALTY, FLIP, MIDGAME, ENDGAME, PSQT, CASTLING_UPDATES, NPM_SCALAR
 
 
+np.seterr(all="raise") # Raise warnings for all numpy errors
+
+
 @dataclass
 class Score: # Positive values favor white, negative values favor black
     """
@@ -121,7 +124,7 @@ class Score: # Positive values favor white, negative values favor black
         # --- Material and Position Scores ---
         for square in chess.SQUARES:
             piece_type = board.piece_type_at(square)
-            if piece_type:
+            if piece_type and piece_type != chess.KING:
                 piece_color = board.color_at(square)
 
                 # Update npm score
@@ -197,7 +200,7 @@ class Score: # Positive values favor white, negative values favor black
         _flip = FLIP
 
         # Cache tables for faster lookups
-        _piece_values: dict[int, int] = PIECE_VALUES_STOCKFISH
+        _piece_values: list[np.int16] = PIECE_VALUES_STOCKFISH
         _mg_tables: list[Optional[np.ndarray]] = PSQT[MIDGAME]
         _eg_tables: list[Optional[np.ndarray]] = PSQT[ENDGAME]
 

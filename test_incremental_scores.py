@@ -7,6 +7,7 @@ from timeit import default_timer
 RED = "\033[91m"
 RESET = "\033[0m"
 
+
 def print_score_details(score: Score, label=""):
     """Print detailed score information."""
     print(f"{label} Score Details:")
@@ -21,11 +22,13 @@ def print_score_details(score: Score, label=""):
     print(f"  Final evaluation: {final_score}")
     print()
 
+
 def highlight_diff(value):
     """Return a value with red highlighting if non-zero."""
     if value != 0:
         return f"{RED}{value}{RESET}"
     return value
+
 
 def test_position(fen, move_uci=None):
     """Test a position with both initialize and update methods."""
@@ -44,7 +47,8 @@ def test_position(fen, move_uci=None):
     # If a move is provided, test updating
     if move_uci:
         # Create a copy of the score for updating
-        incremental_score = Score(init_score.material, init_score.mg, init_score.eg, init_score.npm, init_score.pawn_struct, init_score.king_safety)
+        incremental_score = Score(init_score.material, init_score.mg, init_score.eg,
+                                  init_score.npm, init_score.pawn_struct, init_score.king_safety)
 
         # Make the move and update the score
         move = chess.Move.from_uci(move_uci)
@@ -58,19 +62,26 @@ def test_position(fen, move_uci=None):
         print_score_details(fresh_score, "Fresh Initialization of New Position")
 
         # Assert scores match
-        assert(incremental_score.material == fresh_score.material), f"Material scores do not match: {incremental_score.material} != {fresh_score.material}"
-        assert(incremental_score.mg == fresh_score.mg), f"Midgame scores do not match: {incremental_score.mg} != {fresh_score.mg}"
-        assert(incremental_score.eg == fresh_score.eg), f"Endgame scores do not match: {incremental_score.eg} != {fresh_score.eg}"
-        assert(incremental_score.npm == fresh_score.npm), f"Non-pawn material scores do not match: {incremental_score.npm} != {fresh_score.npm}"
-        assert(incremental_score.pawn_struct == fresh_score.pawn_struct), f"Pawn structure scores do not match: {incremental_score.pawn_struct} != {fresh_score.pawn_struct}"
-        assert(incremental_score.king_safety == fresh_score.king_safety), f"King safety scores do not match: {incremental_score.king_safety} != {fresh_score.king_safety}"
+        assert (incremental_score.material ==
+                fresh_score.material), f"Material scores do not match: {incremental_score.material} != {fresh_score.material}"
+        assert (incremental_score.mg ==
+                fresh_score.mg), f"Midgame scores do not match: {incremental_score.mg} != {fresh_score.mg}"
+        assert (incremental_score.eg ==
+                fresh_score.eg), f"Endgame scores do not match: {incremental_score.eg} != {fresh_score.eg}"
+        assert (incremental_score.npm ==
+                fresh_score.npm), f"Non-pawn material scores do not match: {incremental_score.npm} != {fresh_score.npm}"
+        assert (incremental_score.pawn_struct ==
+                fresh_score.pawn_struct), f"Pawn structure scores do not match: {incremental_score.pawn_struct} != {fresh_score.pawn_struct}"
+        assert (incremental_score.king_safety ==
+                fresh_score.king_safety), f"King safety scores do not match: {incremental_score.king_safety} != {fresh_score.king_safety}"
 
         incremental = incremental_score.calculate()
         fresh = fresh_score.calculate()
-        assert(incremental == fresh), f"Final scores do not match: {incremental} != {fresh}"
+        assert (incremental == fresh), f"Final scores do not match: {incremental} != {fresh}"
 
     print("-" * 80)
     return board
+
 
 if __name__ == "__main__":
     # Test individual positions from your game
@@ -118,6 +129,8 @@ if __name__ == "__main__":
     fen10 = "8/8/3kpNp1/4N3/4bKP1/6P1/2p5/3r4 b - - 1 52"
     board10 = test_position(fen10, "c2c1q") # Pawn promotes to queen
 
+    fen11 = "r1bqkb1r/pppp1p1p/4p1pQ/4P3/3P4/8/PPP2nPP/RNB1KBNR w KQkq - 2 10"
+    board11 = test_position(fen11, "e1f2")
 
     board = chess.Board(fen1)
     score = Score()

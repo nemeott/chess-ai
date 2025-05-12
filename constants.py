@@ -37,22 +37,15 @@ BREAK_TURN: Optional[np.int8] = None # Number of turns to break after (for debug
 
 
 # --- Piece Values and Bonuses ---
-PIECE_VALUES: dict[int, int] = {
-    chess.PAWN: 100,
-    chess.KNIGHT: 320,
-    chess.BISHOP: 330,
-    chess.ROOK: 500,
-    chess.QUEEN: 900,
-    chess.KING: 20000
-}
-PIECE_VALUES_STOCKFISH: dict[int, int] = {
-    chess.PAWN: 208,
-    chess.KNIGHT: 781,
-    chess.BISHOP: 825,
-    chess.ROOK: 1_276,
-    chess.QUEEN: 2_538,
-    chess.KING: 32_000
-} # TODO: Add interpolation between MG: 198, 817, 836, 1_270, 2_521, EG: 258, 846, 857, 1_278, 2_558
+PIECE_VALUES_STOCKFISH: list[np.int16] = [
+    np.int16(0), # Python chess starts piece indexing at 1, so we add an empty slot
+    np.int16(208), # Pawn
+    np.int16(781), # Knight
+    np.int16(825), # Bishop
+    np.int16(1_276), # Rook
+    np.int16(2_538), # Queen
+    np.int16(32_000) # King (Not max value to avoid overflow if capturing queen (MVV-LVA))
+]
 
 BISHOP_PAIR_BONUS = np.int16(PIECE_VALUES_STOCKFISH[chess.PAWN] >> 1) # Half the value of a pawn
 
