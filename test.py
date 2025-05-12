@@ -1,15 +1,16 @@
-import numba as np
+import numpy as np
+import numba as nb
 from numba import jit
 from timeit import default_timer
 
-@jit
+@jit(parallel=True)
 def _recursive_function(nodes, depth):
     nodes += 1
 
     if depth == 0:
         return
     
-    for i in range(35):
+    for i in nb.prange(35):
         _recursive_function(nodes, depth - 1)
 
 class RecursiveFunction:

@@ -1,5 +1,6 @@
 import chess
 import numpy as np # For piece square tables
+
 from typing_extensions import TypeAlias # For GameStage
 from typing import Optional
 from numpy.typing import NDArray # Add this import at the top of the file if not already present
@@ -60,13 +61,13 @@ DOUBLED_PAWN_PENALTY = np.int8(10) # Penalty for doubled pawns
 
 # Total npm at start (16604 with stockfish values)
 START_NPM = np.int16(PIECE_VALUES_STOCKFISH[chess.KNIGHT] * 4 +
-                               PIECE_VALUES_STOCKFISH[chess.BISHOP] * 4 +
-                               PIECE_VALUES_STOCKFISH[chess.ROOK] * 4 +
-                               PIECE_VALUES_STOCKFISH[chess.QUEEN] * 2)
+                     PIECE_VALUES_STOCKFISH[chess.BISHOP] * 4 +
+                     PIECE_VALUES_STOCKFISH[chess.ROOK] * 4 +
+                     PIECE_VALUES_STOCKFISH[chess.QUEEN] * 2)
 # NPM scalar for evaluation (65 with stockfish values)
 NPM_SCALAR = np.int8((START_NPM // 256) + 1)
 
-# --- Misc Constants ---
+# --- Miscellaneous ---
 
 """
 Flips a square (eg. A1 -> A8)

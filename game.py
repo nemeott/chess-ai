@@ -13,8 +13,10 @@ from typing import Literal, Optional
 
 from constants import IS_BOT, UPDATE_DELAY_MS, LAST_MOVE_ARROW, CHECKING_MOVE_ARROW, BREAK_TURN, WHITE_USE_OPENING_BOOK, BLACK_USE_OPENING_BOOK
 
+
 class ChessGame:
-    __slots__ = ["board", "checking_move", "last_move", "last_update_time", "score", "white_player", "black_player", "piece_images", "square_colors", "highlighted_square_color", "WINDOW_SIZE", "screen", "empty_board_surface", "last_board_state"]
+    __slots__ = ["board", "checking_move", "last_move", "last_update_time", "score", "white_player", "black_player", "piece_images",
+                 "square_colors", "highlighted_square_color", "WINDOW_SIZE", "screen", "empty_board_surface", "last_board_state"]
 
     def __init__(self):
         self.board = ChessBoard()
@@ -30,14 +32,14 @@ class ChessGame:
         else:
             self.white_player = HumanPlayer(self, chess.WHITE)
             self.black_player = ChessBot(self, BLACK_USE_OPENING_BOOK)
-            
+
         self.score = Score()
         self.score.initialize(self.board.get_board_state()) # Initialize scores once and update from there
 
         # Cache for piece images and board squares
         self.piece_images = {}
 
-                # Use the default chess.svg colors (tan/brown)
+        # Use the default chess.svg colors (tan/brown)
         self.square_colors = {
             'light': pygame.Color('#f0d9b5'), # Tan/cream squares (default chess.svg)
             'dark': pygame.Color('#b58863'), # Brown squares (default chess.svg)
@@ -54,7 +56,7 @@ class ChessGame:
 
         # Pre-render all piece images
         self.prerender_pieces()
-        
+
         # Initialize last board state for optimized rendering
         self.last_board_state = None
 
@@ -76,7 +78,7 @@ class ChessGame:
         mode = image.mode
         size = image.size
         data = image.tobytes()
-        
+
         mode_literal: Literal['P', 'RGB', 'RGBX', 'RGBA', 'ARGB', 'BGRA'] = mode # type: ignore
         return pygame.image.fromstring(data, size, mode_literal)
 
@@ -84,7 +86,7 @@ class ChessGame:
         """Create and cache the empty chess board with squares"""
         square_size = self.WINDOW_SIZE // 8
         surface = pygame.Surface((self.WINDOW_SIZE, self.WINDOW_SIZE))
-        
+
         # Draw board squares
         for rank in range(8):
             for file in range(8):
@@ -92,20 +94,20 @@ class ChessGame:
                 square_color = self.square_colors['light' if is_light else 'dark']
                 rect = pygame.Rect(file * square_size, rank * square_size, square_size, square_size)
                 surface.fill(square_color, rect)
-        
+
         return surface
 
     def prerender_pieces(self):
         """Pre-render all chess piece images at the correct size"""
         piece_symbols = ['p', 'n', 'b', 'r', 'q', 'k', 'P', 'N', 'B', 'R', 'Q', 'K']
         square_size = self.WINDOW_SIZE // 8
-        
+
         # Create high resolution pieces then scale them once
         for symbol in piece_symbols:
             piece_svg = f"""<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="500" height="500" viewBox="0 0 45 45">
                 {chess.svg.PIECES[symbol]}
             </svg>"""
-            
+
             # Convert to Pygame surface and pre-scale to square size
             piece_img = self.svg_to_pygame_surface(piece_svg)
             self.piece_images[symbol] = pygame.transform.scale(piece_img, (square_size, square_size))
@@ -114,10 +116,10 @@ class ChessGame:
         """Render chess board using cached empty board and pieces"""
         board_state = self.board.get_board_state()
         square_size = self.WINDOW_SIZE // 8
-        
+
         # Start with a copy of the empty board
         surface = self.empty_board_surface.copy()
-        
+
         # Only highlight last move squares and selected square
         if last_move:
             for square in [last_move.from_square, last_move.to_square]:
@@ -127,7 +129,7 @@ class ChessGame:
                 square_color = self.square_colors['light_lastmove' if is_light else 'dark_lastmove']
                 rect = pygame.Rect(file * square_size, rank * square_size, square_size, square_size)
                 surface.fill(square_color, rect)
-        
+
         # Highlight selected square
         if selected_square is not None:
             file = chess.square_file(selected_square)
@@ -135,63 +137,64 @@ class ChessGame:
             highlight_surf = pygame.Surface((square_size, square_size), pygame.SRCALPHA)
             highlight_surf.fill(self.highlighted_square_color)
             surface.blit(highlight_surf, (file * square_size, rank * square_size))
-        
+
         # Draw pieces (now using pre-scaled pieces)
         for rank in range(8):
             for file in range(8):
-                square = chess.square(file, 7-rank)
+                square = chess.square(file, 7 - rank)
                 piece = board_state.piece_at(square)
                 if piece:
                     # Directly use the pre-scaled piece image
                     surface.blit(self.piece_images[piece.symbol()], (file * square_size, rank * square_size))
-        
+
         # Draw arrows if needed
         if LAST_MOVE_ARROW and last_move:
             # Using solid blue to match SVG arrow color
             self.draw_arrow(surface, last_move.from_square, last_move.to_square, pygame.Color("#0000FF"))
-        
+
         if CHECKING_MOVE_ARROW and self.checking_move:
             # Using solid red to match SVG arrow color
-            self.draw_arrow(surface, self.checking_move.from_square, self.checking_move.to_square, pygame.Color("#FF0000"))
-        
+            self.draw_arrow(surface, self.checking_move.from_square,
+                            self.checking_move.to_square, pygame.Color("#FF0000"))
+
             return surface
 
     def draw_arrow(self, surface, from_square, to_square, color):
         """Draw an arrow that matches the SVG implementation"""
         square_size = self.WINDOW_SIZE // 8
-        
+
         # Calculate start and end positions (centered in squares)
         from_file, from_rank = chess.square_file(from_square), 7 - chess.square_rank(from_square)
         to_file, to_rank = chess.square_file(to_square), 7 - chess.square_rank(to_square)
-        
+
         # Match the SVG coordinate calculations
         xtail = (from_file + 0.5) * square_size
         ytail = (from_rank + 0.5) * square_size
         xhead = (to_file + 0.5) * square_size
         yhead = (to_rank + 0.5) * square_size
-        
+
         # Calculate the direction vector
         dx, dy = xhead - xtail, yhead - ytail
         hypot = math.hypot(dx, dy)
-        
+
         if hypot == 0:
             return # Can't draw an arrow with zero length
-        
+
         # Create semitransparent surface for entire arrow
         arrow_surface = pygame.Surface((self.WINDOW_SIZE, self.WINDOW_SIZE), pygame.SRCALPHA)
-        
+
         # Use exact parameters from the SVG implementation
         marker_size = 0.75 * square_size
         marker_margin = 0.1 * square_size
-        
+
         # Calculate shaft endpoint (where head begins)
         shaft_x = xhead - dx * (marker_size + marker_margin) / hypot
         shaft_y = yhead - dy * (marker_size + marker_margin) / hypot
-        
+
         # Calculate arrowhead tip position (slightly inset from square edge)
         xtip = xhead - dx * marker_margin / hypot
         ytip = yhead - dy * marker_margin / hypot
-        
+
         # Draw thick shaft - match SVG stroke width
         pygame.draw.line(
             arrow_surface,
@@ -200,17 +203,17 @@ class ChessGame:
             (shaft_x, shaft_y),
             width=int(square_size * 0.2) # Match the SVG stroke-width
         )
-        
+
         # Calculate arrowhead points using SVG algorithm
         marker_points = [
             (xtip, ytip), # Tip
             (shaft_x + dy * 0.5 * marker_size / hypot, shaft_y - dx * 0.5 * marker_size / hypot),
             (shaft_x - dy * 0.5 * marker_size / hypot, shaft_y + dx * 0.5 * marker_size / hypot)
         ]
-        
+
         # Draw arrowhead
         pygame.draw.polygon(arrow_surface, color, marker_points)
-        
+
         # Blit the arrow onto the main surface
         surface.blit(arrow_surface, (0, 0))
 
@@ -221,7 +224,7 @@ class ChessGame:
         if not force_update and hasattr(self, 'last_update_time'):
             if current_time - self.last_update_time < UPDATE_DELAY_MS:
                 return
-                
+
         if CHECKING_MOVE_ARROW and self.checking_move:
             # Use fast direct rendering during AI analysis
             board_surface = self.fast_render_board(last_move, selected_square)
@@ -264,11 +267,11 @@ class ChessGame:
                     "square dark": "#b58863", # Brown
                 }
             )
-            
+
             # Convert SVG to Pygame surface and display
             py_image = self.svg_to_pygame_surface(svg)
             self.screen.blit(py_image, (0, 0))
-        
+
         pygame.display.flip()
         self.last_update_time = current_time
 
@@ -279,23 +282,24 @@ class ChessGame:
         # Warm up numba calculate function (compile)
         _ = Score()
         _ = _.updated(self.board.get_board_state(), chess.Move.from_uci("e2e4"))
-        
+
         while not self.board.is_game_over():
-            print(f"Player: {'White' if self.board.get_board_state().turn else 'Black'} - {self.board.get_board_state().fullmove_number}")
+            print(
+                f"Player: {'White' if self.board.get_board_state().turn else 'Black'} - {self.board.get_board_state().fullmove_number}")
 
             # Get current player for selected square highlighting
             current_player = self.white_player if self.board.get_board_state().turn else self.black_player
             selected_square = getattr(current_player, 'selected_square', None)
-            
+
             # Display current board with highlights
             self.display_board(self.last_move, selected_square, force_update=True)
-            
+
             # Determine current player
             current_player = self.white_player if self.board.get_board_state().turn else self.black_player
-            
+
             # Get player's move
             move = current_player.get_move(self.board.get_board_state())
-            
+
             if move is None:
                 print("Game ended by player")
                 break
@@ -314,18 +318,24 @@ class ChessGame:
             actual = actual_score.calculate()
 
             print(f"Eval: {incremental}, {actual}")
-            
+
             print(f"Move played: {move}")
 
             # Assert scores match
-            assert(incremental_score.material == actual_score.material), f"Material score mismatch: {incremental_score.material} != {actual_score.material}"
-            assert(incremental_score.mg == actual_score.mg), f"Midgame score mismatch: {incremental_score.mg} != {actual_score.mg}"
-            assert(incremental_score.eg == actual_score.eg), f"Endgame score mismatch: {incremental_score.eg} != {actual_score.eg}"
-            assert(incremental_score.npm == actual_score.npm), f"Non-pawn material score mismatch: {incremental_score.npm} != {actual_score.npm}"
-            assert(incremental_score.pawn_struct == actual_score.pawn_struct), f"Pawn structure score mismatch: {incremental_score.pawn_struct} != {actual_score.pawn_struct}"
-            assert(incremental_score.king_safety == actual_score.king_safety), f"King safety score mismatch: {incremental_score.king_safety} != {actual_score.king_safety}"
+            assert (incremental_score.material ==
+                    actual_score.material), f"Material score mismatch: {incremental_score.material} != {actual_score.material}"
+            assert (incremental_score.mg ==
+                    actual_score.mg), f"Midgame score mismatch: {incremental_score.mg} != {actual_score.mg}"
+            assert (incremental_score.eg ==
+                    actual_score.eg), f"Endgame score mismatch: {incremental_score.eg} != {actual_score.eg}"
+            assert (incremental_score.npm ==
+                    actual_score.npm), f"Non-pawn material score mismatch: {incremental_score.npm} != {actual_score.npm}"
+            assert (incremental_score.pawn_struct ==
+                    actual_score.pawn_struct), f"Pawn structure score mismatch: {incremental_score.pawn_struct} != {actual_score.pawn_struct}"
+            assert (incremental_score.king_safety ==
+                    actual_score.king_safety), f"King safety score mismatch: {incremental_score.king_safety} != {actual_score.king_safety}"
 
-            assert(incremental == actual), f"Score mismatch: {incremental} != {actual}"
+            assert (incremental == actual), f"Score mismatch: {incremental} != {actual}"
 
             print("--------------------------------------------------------------")
             self.last_move = move
@@ -333,13 +343,12 @@ class ChessGame:
             if BREAK_TURN and self.board.get_board_state().fullmove_number > BREAK_TURN:
                 pygame.quit()
                 return
-            
+
         # Display final position
         self.display_board(self.last_move, force_update=True)
         print(f"Number of turns: {self.board.get_board_state().fullmove_number}") # Print number of turns
         result = self.board.get_result()
         print(f"Game Over! Result: {result}")
-
 
         running = True
         while running:
@@ -347,6 +356,7 @@ class ChessGame:
                 if event.type == pygame.QUIT:
                     running = False
         pygame.quit()
+
 
 if __name__ == "__main__":
     game = ChessGame()

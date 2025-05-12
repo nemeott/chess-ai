@@ -1,22 +1,21 @@
 import chess
 from chess import polyglot # Polyglot for opening book
 # from chess.polyglot import zobrist_hash # Built-in Zobrist hashing  TODO implement incremental hashing
-
-from dataclasses import dataclass
 import numpy as np
 
+from lru import LRU # For TT and history tables
+from sys import getsizeof # For memory usage calculations
+
+from dataclasses import dataclass
 from typing_extensions import TypeAlias # For flags
 from typing import Generator, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from game import ChessGame # Only import while type checking
 
-from lru import LRU # For TT and history tables
-from sys import getsizeof # For memory usage calculations
-
 from constants import DEPTH, MAX_VALUE, MIN_VALUE, CHECKING_MOVE_ARROW, RENDER_DEPTH, TT_SIZE, PIECE_VALUES_STOCKFISH, OPENING_BOOK_PATH
 from score import Score # For position evaluation
-
 import colors # Debug log colors
+
 from timeit import default_timer # For debug timing
 
 
@@ -47,8 +46,8 @@ class ChessBot:
     """
     Class to represent the chess bot.
     """
-    __slots__ = ["game", "moves_checked", "transposition_table",
-                 "opening_book", "history"] # Optimization for fast lookups
+    __slots__ = ["game", "moves_checked", "quiescence_moves_checked",
+                 "transposition_table", "opening_book", "history"] # Optimization for fast lookups
 
     def __init__(self, game, use_opening_book: bool = True) -> None:
         """
@@ -57,6 +56,7 @@ class ChessBot:
         """
         self.game: "ChessGame" = game
         self.moves_checked: int = 0
+        self.quiescence_moves_checked: int = 0
 
         # Initialize transposition table with size in MB
         tt_entry_size = getsizeof(TTEntry(np.int8(0), np.int16(0), EXACT, chess.Move.from_uci("e2e4")), 64)
@@ -140,7 +140,7 @@ class ChessBot:
                     attacker_piece_type = _piece_type_at(move.from_square)
 
                     # Handle en passant captures
-                    if not victim_piece_type and attacker_piece_type == chess.PAWN: # Implied en passant capture since no piece at to_square and pawn moving
+                    if not victim_piece_type: # Implied en passant capture since no piece at to_square and pawn moving
                         victim_piece_type = _piece_type_at(move.to_square - (color_multiplier * 8))
                         score += 5 # Small bonus for en passant captures
 
@@ -157,58 +157,63 @@ class ChessBot:
                 ordered_moves.append((move, score))
 
         ordered_moves.sort(key=lambda x: x[1], reverse=True)
-        # print(len(ordered_moves)) if len(ordered_moves) > 30 else None
 
         for move_and_score in ordered_moves:
             yield move_and_score[0]
 
-    def quiescence(self, board: chess.Board, depth, alpha, beta, score) -> np.int16:
-        """
-        Quiescence search to avoid horizon effect.
-        Searches only captures until a quiet position is reached.
-        """
-        # self.moves_checked += 1
+    # @staticmethod
+    # def worth_capturing(board: chess.Board, move: chess.Move) -> bool:
+    #     if move.promotion:
+    #         return True
 
-        # Cache functions for faster lookups
-        _piece_type_at = board.piece_type_at
-        _push = board.push
-        _pop = board.pop
+    #     attacker_piece_type = board.piece_type_at(move.from_square)
+    #     victim_piece_type = board.piece_type_at(move.to_square)
 
-        # Cache table for faster lookups
-        _piece_values = PIECE_VALUES_STOCKFISH
+    #     # Handle en passant captures
+    #     if not victim_piece_type: # Implied en passant capture, the move is a capture
+    #         color_multiplier = 1 if board.turn else -1 # 1 for white, -1 for black
+    #         victim_piece_type = board.piece_type_at(move.to_square - (color_multiplier * 8))
 
-        color_multiplier = 1 if board.turn else -1 # 1 for white, -1 for black
+    #     return PIECE_VALUES_STOCKFISH[victim_piece_type] - PIECE_VALUES_STOCKFISH[attacker_piece_type] >= 0 # type: ignore # nopep8
 
-        # Evaluate position (lazy evaluation)
-        stand_pat = score.calculate()
+    # def quiescence(self, board: chess.Board, depth, alpha, beta, score) -> np.int16:
+    #     """
+    #     Quiescence search to avoid horizon effect.
+    #     Searches only captures until a quiet position is reached.
+    #     """
+    #     self.quiescence_moves_checked += 1
 
-        if stand_pat >= beta: # Beta cutoff
-            return beta # TODO: Test vs returning stand pat
-        if alpha < stand_pat: # Update alpha if stand pat is better
-            alpha = stand_pat
+    #     # Evaluate position (lazy evaluation)
+    #     stand_pat = score.calculate()
 
-        for move in board.generate_legal_captures():
-            # Skip if capture is not worth it
-            if not move.promotion:
-                victim_piece_type = _piece_type_at(move.to_square)
-                if not victim_piece_type and board.is_en_passant(move):
-                    victim_piece_type = _piece_type_at(move.to_square - (color_multiplier * 8))
+    #     if depth == 0:
+    #         return stand_pat
 
-                if stand_pat + _piece_values[victim_piece_type] <= alpha: # type: ignore
-                    continue
+    #     if stand_pat >= beta: # Beta cutoff
+    #         return beta # TODO: Test vs return stand_pat
+    #     if alpha < stand_pat: # Update alpha if stand pat is better
+    #         alpha = stand_pat
 
-            updated_score: Score = score.updated(board, move)
+    #     # Cache functions for faster lookups
+    #     _push = board.push
+    #     _pop = board.pop
 
-            _push(move)
-            value = -self.quiescence(board, depth - 1, -beta, -alpha, updated_score)
-            _pop()
+    #     for move in board.generate_legal_captures():
+    #         if not self.worth_capturing(board, move): # Skip if capture is not worth it
+    #             continue
 
-            if value >= beta: # Beta cutoff
-                return beta
-            if value > alpha: # Update alpha if value is better
-                alpha = value
+    #         updated_score: Score = score.updated(board, move)
 
-        return alpha # Return the best value found
+    #         _push(move)
+    #         value = self.quiescence(board, depth - 1, -beta, -alpha, updated_score)
+    #         _pop()
+
+    #         if value >= beta: # Beta cutoff
+    #             return beta
+    #         if value > alpha: # Update alpha if value is better
+    #             alpha = value
+
+    #     return alpha # Return the best value found
 
     def alpha_beta(self, board: chess.Board, depth: np.int8, alpha: float, beta: float, maximizing_player: bool, score: Score, allow_null_move: bool = True) -> tuple[np.int16, Optional[chess.Move]]:
         """
@@ -248,7 +253,7 @@ class ChessBot:
         # Terminal node check
         if depth == 0:
             value = self.evaluate_position(board, score, tt_entry)
-            # self.transposition_table[key] = TTEntry(depth, value, EXACT, None) # ? SLOW
+            self.transposition_table[key] = TTEntry(depth, value, EXACT, None) # ? Slowish
             return value, None # No move to return
             # return self.quiescence(board, 3, alpha, beta, score), None # No move to return
 
@@ -415,8 +420,8 @@ class ChessBot:
 
             beta = max(int(guess), int(lower_bound) + 1)
 
-            guess, best_move = self.alpha_beta(board, DEPTH, beta - 1, beta, board.turn,
-                                               self.game.score, allow_null_move=False)
+            guess, best_move = self.alpha_beta(board, DEPTH, beta - 1, beta,
+                                               board.turn, self.game.score, allow_null_move=False)
             if guess < beta:
                 upper_bound = guess
             else:
