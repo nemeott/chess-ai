@@ -1,20 +1,17 @@
-from numba.experimental import jitclass
-from numba import types, int8, int16
 import chess
 from chess import polyglot # Polyglot for opening book
 import numpy as np
 
-from lru import LRU # For TT and history tables
+from lru import LRU # For transposition table
 from sys import getsizeof # For memory usage calculations
 
-from dataclasses import dataclass
-from typing_extensions import TypeAlias # For flags
 from typing import Generator, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from game import ChessGame # Only import while type checking
 
-from constants import DEPTH, MAX_VALUE, MIN_VALUE, CHECKING_MOVE_ARROW, RENDER_DEPTH, TT_SIZE, PIECE_VALUES_STOCKFISH, OPENING_BOOK_PATH
+from tt_entry import TTEntry, EXACT, LOWERBOUND, UPPERBOUND
 from score import Score # For position evaluation
+from constants import DEPTH, MAX_VALUE, MIN_VALUE, CHECKING_MOVE_ARROW, RENDER_DEPTH, TT_SIZE, PIECE_VALUES_STOCKFISH, OPENING_BOOK_PATH
 import colors # Debug log colors
 
 from timeit import default_timer # For debug timing
@@ -22,38 +19,19 @@ from timeit import default_timer # For debug timing
 
 np.seterr(all="raise") # Raise warnings for all numpy errors
 
-# Transposition table entry flags
-Flag: TypeAlias = np.int8
-EXACT: Flag = np.int8(1)
-LOWERBOUND: Flag = np.int8(2) # Beta (fail-high)
-UPPERBOUND: Flag = np.int8(3) # Alpha (fail-low)
-
-
-@dataclass(frozen=True)
-class TTEntry:
-    """
-    Class to represent a transposition table entry.
-    Stores the depth, value, flag, and best move for a position.
-    """
-    __slots__ = ["depth", "value", "flag", "best_move"] # Optimization for faster lookups
-
-    depth: np.int8
-    value: np.int16
-    flag: Flag
-    best_move: Optional[chess.Move]
-
 
 class ChessBot:
     """
     Class to represent the chess bot.
     """
     __slots__ = ["game", "moves_checked", "quiescence_moves_checked",
-                 "transposition_table", "opening_book", "history"] # Optimization for fast lookups
+                 "transposition_table", "opening_book"] # Optimization for fast lookups
 
     def __init__(self, game, use_opening_book: bool = True) -> None:
         """
         Initialize the chess bot with the game instance.
         Also initializes the transposition table with size in MB.
+        Initializes the opening book if using and valid.
         """
         self.game: "ChessGame" = game
         self.moves_checked: int = 0
@@ -72,20 +50,11 @@ class ChessBot:
             except Exception as e:
                 print(f"{colors.RED}Error loading opening book: {e}{colors.RESET}")
 
-        self.history: set = set()
-
-    def display_checking_move_arrow(self, move) -> None:
-        """
-        Display an arrow on the board for the move being checked.
-        Used for debugging purposes.
-        """
-        self.game.arrow_move = move
-        self.game.display_board(self.game.last_move) # Update display
-
-    def increment_moves_and_render_arrow(self, depth: np.int8, move: chess.Move) -> None:
+    def increment_moves_and_render_debug_arrow(self, depth: np.int8, move: chess.Move) -> None:
         self.moves_checked += 1
         if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH: # Display the root move
-            self.display_checking_move_arrow(move)
+            self.game.arrow_move = move
+            self.game.display_board(self.game.last_move) # Update display
 
     def evaluate_position(self, board: chess.Board, score: Score, tt_entry: Optional[TTEntry] = None, has_legal_moves: bool = True) -> np.int16:
         """
@@ -216,6 +185,187 @@ class ChessBot:
 
     #     return alpha # Return the best value found
 
+    def mt_negamax(self, board: chess.Board, depth: np.int8, gamma: np.int16, color_multiplier: np.int8, score: Score, allow_null_move: bool = True) -> tuple[np.int16, Optional[chess.Move]]:
+        """
+        Memory-enhanced Test negamax search algorithm proposed by Jan-Jaap van Horssen.
+        Uses a null window search to find the best move.
+        Gamma replaces beta, and alpha is replaced with beta - 1.
+        Scores are incrementally updated based on the move.
+        Returns the best value and move for the current player.
+        """
+        # Terminal node check
+        if depth == 0:
+            value = np.int16(color_multiplier) * self.evaluate_position(board, score)
+            return value, None # No move to return
+            # return self.quiescence(board, 3, alpha, beta, score), None # No move to return
+
+        # Lookup position in transposition table
+        key = board._transposition_key() # ? Much faster than python-chess's zobrist hashing
+        tt_entry: Optional[TTEntry] = self.transposition_table.get(key)
+
+        # If position is in transposition table and depth is sufficient
+        tt_move = None
+        if tt_entry:
+            tt_move = tt_entry.best_move # Save best TT move (use later in move ordering)
+            if tt_entry.depth >= depth:
+                if tt_entry.flag == LOWERBOUND and tt_entry.value >= gamma:
+                    return tt_entry.value, tt_move
+                elif tt_entry.flag == UPPERBOUND and tt_entry.value < gamma:
+                    return tt_entry.value, tt_move
+
+        # Cache functions for faster lookups
+        _push = board.push
+        _pop = board.pop
+        _score_updated = score.updated
+        _increment_moves_and_render_arrow = self.increment_moves_and_render_debug_arrow
+
+        # --- Null Move Pruning ---
+        # Allow null move pruning if:
+        # 1. Last move was not a null move
+        # 2. Depth is greater than or equal to 3
+        # 3. The player has non-pawn pieces (avoid zugzwang)
+        # 4. The score is not too low
+        # 5. The position is not in check
+        if allow_null_move and depth >= 3:
+            maximizing_player = True if color_multiplier == 1 else False
+            bitboard: chess.Bitboard = board.occupied_co[maximizing_player] # Get bitboard for current player
+            bitboard = bitboard & ~board.pawns & ~board.kings # Remove pawns and kings from bitboard
+            if bitboard > 0: # If there are non-pawn pieces (avoid zugzwang)
+                eval = np.int16(color_multiplier) * score.calculate()
+                if eval >= gamma and not board.is_check(): # If not in check
+                    R = 3 if (depth > 3 and score.npm < 1_500) else 2 # Reduction factor
+
+                    _push(chess.Move.null()) # Make null move (skip turn)
+                    null_value: np.int16 = -self.mt_negamax(board, depth - R - 1, -gamma,
+                                                            -color_multiplier, score, allow_null_move=False)[0]
+                    _pop() # Undo null move
+
+                    if null_value >= gamma: # If null move causes beta cutoff, prune this subtree
+                        return null_value, None
+
+        best_move = None
+        best_value: np.int16 = MIN_VALUE
+        for move in self.ordered_moves_generator(board, tt_move):
+            _increment_moves_and_render_arrow(depth, move) # TODO: Move increment outside to start of alpha-beta
+
+            updated_score: Score = _score_updated(board, move)
+            _push(move)
+            value = -self.mt_negamax(board, depth - 1, -gamma + 1, -color_multiplier, updated_score)[0]
+            _pop()
+
+            if value > best_value: # Get new best value and move
+                best_value, best_move = value, move
+                if best_value >= gamma:
+                    break # Beta cutoff (fail-high: opponent won't allow this position)
+
+        # Store position in transposition table according to Jan-Jaap van Horssen's algorithm
+        # There are three viable options for the new TT move in function MT:
+        # tt.store(board, g, g < gamma ? UPPER : LOWER, depth, <NEW_TT_MOVE>);
+        # --> OLD (50.1%): <NEW_TT_MOVE> := move (least moves checked)
+        #     NEW (49.6%): <NEW_TT_MOVE> := g >= gamma ? move : NO_MOVE
+        #     HIGH (50.2%): <NEW_TT_MOVE> := g >= gamma ? move : ttMove (2nd least moves checked)
+        if best_value < gamma:
+            flag = UPPERBOUND
+            # best_move = tt_move # Uncomment for HIGH
+            # best_move = None # Uncomment for NEW (requires fix in MTD)
+        else: # best_value >= gamma
+            flag = LOWERBOUND
+
+        self.transposition_table[key] = TTEntry(depth, best_value, flag, best_move)
+
+        return best_value, best_move
+
+    def negamax_alpha_beta(self, board: chess.Board, depth: np.int8, alpha: np.int16, beta: np.int16, color_multiplier: int, score: Score, allow_null_move: bool = True) -> tuple[np.int16, Optional[chess.Move]]:
+        """
+        Negamax search algorithm with alpha-beta pruning and transposition table.
+        Scores are incrementally updated based on the move.
+        Returns the best value and move for the current player.
+        """
+        # Cache functions for faster lookups
+        _push = board.push
+        _pop = board.pop
+        _score_updated = score.updated
+        _increment_moves_and_render_arrow = self.increment_moves_and_render_debug_arrow
+
+        original_alpha = alpha
+
+        # Lookup position in transposition table
+        key = board._transposition_key() # ? Much faster
+        tt_entry: Optional[TTEntry] = self.transposition_table.get(key)
+
+        # If position is in transposition table and depth is sufficient
+        tt_move = None
+        if tt_entry and tt_entry.depth >= depth:
+            tt_move = tt_entry.best_move
+            if tt_entry.flag == EXACT:
+                return tt_entry.value, tt_move
+            elif tt_entry.flag == LOWERBOUND and tt_entry.value >= beta:
+                return tt_entry.value, tt_move
+            elif tt_entry.flag == UPPERBOUND and tt_entry.value <= alpha:
+                return tt_entry.value, tt_move
+
+        # Terminal node check
+        if depth == 0:
+            value = color_multiplier * self.evaluate_position(board, score, tt_entry)
+            self.transposition_table[key] = TTEntry(depth, value, EXACT, None) # ? Slowish
+            return value, None # No move to return
+            # return self.quiescence(board, 3, alpha, beta, score), None # No move to return
+
+        # # --- Null Move Pruning ---
+        # # Allow null move pruning if:
+        # # 1. Last move was not a null move
+        # # 2. Depth is greater than or equal to 3
+        # # 3. The player has non-pawn pieces (avoid zugzwang)
+        # # 4. The score is not too low
+        # # 5. The position is not in check
+        # if allow_null_move and depth >= 3:
+        #     maximizing_player = True if color_multiplier == 1 else False
+        #     bitboard: chess.Bitboard = board.occupied_co[maximizing_player] # Get bitboard for current player
+        #     bitboard = bitboard & ~board.pawns & ~board.kings # Remove pawns and kings from bitboard
+        #     if bitboard > 0: # If there are non-pawn pieces (avoid zugzwang)
+        #         value = score.calculate()
+        #         if (maximizing_player and value >= beta) or (not maximizing_player and value <= alpha):
+        #             if not board.is_check(): # If not in check
+        #                 R = 3 if (depth > 3 and score.npm < 1_500) else 2 # Reduction factor
+
+        #                 _push(chess.Move.null()) # Make null move (skip turn)
+        #                 null_value: np.int16 = self.negamax_alpha_beta(board, depth - R - 1, -beta, -beta + 1,
+        #                                                                -color_multiplier, score, allow_null_move=False)[0]
+        #                 _pop() # Undo null move
+
+        #                 # If null move causes beta cutoff, prune this subtree
+        #                 if null_value >= beta:
+        #                     return null_value, None
+
+        best_move = None
+        best_value: np.int16 = MIN_VALUE
+        for move in self.ordered_moves_generator(board, tt_move):
+            _increment_moves_and_render_arrow(depth, move) # TODO: Move increment outside to start of alpha-beta
+
+            updated_score: Score = _score_updated(board, move)
+            _push(move)
+            value: np.int16 = -self.negamax_alpha_beta(board, depth - 1, -beta, -alpha,
+                                                       -color_multiplier, updated_score)[0]
+            _pop()
+
+            if value > best_value: # Get new best value and move
+                best_value, best_move = value, move
+                alpha = np.maximum(alpha, best_value)
+                if alpha >= beta:
+                    break # Beta cutoff (fail-high: opponent won't allow this position)
+
+        # Store position in transposition table
+        if best_value <= original_alpha:
+            flag = UPPERBOUND
+        elif best_value >= beta:
+            flag = LOWERBOUND
+        else:
+            flag = EXACT
+
+        self.transposition_table[key] = TTEntry(depth, best_value, flag, best_move)
+
+        return best_value, best_move
+
     def alpha_beta(self, board: chess.Board, depth: np.int8, alpha: float, beta: float, maximizing_player: bool, score: Score, allow_null_move: bool = True) -> tuple[np.int16, Optional[chess.Move]]:
         """
         Fail-soft alpha-beta search with transposition table.
@@ -227,7 +377,7 @@ class ChessBot:
         _push = board.push
         _pop = board.pop
         _score_updated = score.updated
-        _increment_moves_and_render_arrow = self.increment_moves_and_render_arrow
+        _increment_moves_and_render_arrow = self.increment_moves_and_render_debug_arrow
 
         original_alpha, original_beta = alpha, beta
 
@@ -257,32 +407,37 @@ class ChessBot:
             return value, None # No move to return
             # return self.quiescence(board, 3, alpha, beta, score), None # No move to return
 
-        # --- Null Move Pruning ---
-        # Allow null move pruning if:
-        # 1. Last move was not a null move
-        # 2. Depth is greater than or equal to 3
-        # 3. The player has non-pawn pieces (avoid zugzwang)
-        # 4. The score is not too low
-        # 5. The position is not in check
-        if allow_null_move and depth >= 3:
-            bitboard: chess.Bitboard = board.occupied_co[maximizing_player] # Get bitboard for current player
-            bitboard = bitboard & ~board.pawns & ~board.kings # Remove pawns and kings from bitboard
-            if bitboard > 0: # If there are non-pawn pieces (avoid zugzwang)
-                value = score.calculate()
-                if (maximizing_player and value >= beta) or (not maximizing_player and value <= alpha):
-                    if not board.is_check(): # If not in check
-                        R = 3 if (depth > 3 and score.npm < 1_500) else 2 # Reduction factor
+        # # --- Null Move Pruning ---
+        # # Allow null move pruning if:
+        # # 1. Last move was not a null move
+        # # 2. Depth is greater than or equal to 3
+        # # 3. The player has non-pawn pieces (avoid zugzwang)
+        # # 4. The score is not too low
+        # # 5. The position is not in check
+        # if allow_null_move and depth >= 3:
+        #     bitboard: chess.Bitboard = board.occupied_co[maximizing_player] # Get bitboard for current player
+        #     bitboard = bitboard & ~board.pawns & ~board.kings # Remove pawns and kings from bitboard
+        #     if bitboard > 0: # If there are non-pawn pieces (avoid zugzwang)
+        #         value = score.calculate()
+        #         if (maximizing_player and value >= beta) or (not maximizing_player and value <= alpha):
+        #             if not board.is_check(): # If not in check
+        #                 R = 3 if (depth > 3 and score.npm < 1_500) else 2 # Reduction factor
 
-                        _push(chess.Move.null()) # Make null move (skip turn)
-                        null_value: np.int16 = self.alpha_beta(board, np.int8(
-                            depth - R - 1), -beta, -beta + 1, not maximizing_player, score, allow_null_move=False)[0]
-                        _pop() # Undo null move
+        #                 _push(chess.Move.null()) # Make null move (skip turn)
+        #                 if maximizing_player:
+        #                     null_value: np.int16 = self.alpha_beta(board, np.int8(
+        #                         depth - R - 1), -beta, -beta + 1, not maximizing_player, score, allow_null_move=False)[0]
+        #                 else:
+        #                     null_value: np.int16 = self.alpha_beta(board, np.int8(
+        #                         depth - R - 1), -alpha - 1, -alpha, not maximizing_player, score, allow_null_move=False)[0]
 
-                        # If null move causes beta cutoff, prune this subtree
-                        if maximizing_player and null_value >= beta:
-                            return null_value, None
-                        elif not maximizing_player and null_value <= alpha:
-                            return null_value, None
+        #                 _pop() # Undo null move
+
+        #                 # If null move causes beta cutoff, prune this subtree
+        #                 if maximizing_player and null_value >= beta:
+        #                     return null_value, None
+        #                 elif not maximizing_player and null_value <= alpha:
+        #                     return null_value, None
 
         best_move = None
         if maximizing_player:
@@ -363,7 +518,7 @@ class ChessBot:
             better_count = 0
             better = []
             for move in ordered_moves:
-                self.increment_moves_and_render_arrow(DEPTH, move)
+                self.increment_moves_and_render_debug_arrow(DEPTH, move)
 
                 score = original_score.updated(board, move)
                 board.push(move)
@@ -398,20 +553,76 @@ class ChessBot:
 
         return best_value, best_move
 
-    def iterative_deepening_mtd_fix(self, board: chess.Board) -> tuple[np.int16, Optional[chess.Move]]:
+    def iterative_deepening_mtd_fix_driver(self, board: chess.Board) -> tuple[np.int16, Optional[chess.Move]]:
         """
         Iterative deepening driver for MTD(f) search.
-        TODO: Investigate different ways to calculate the initial first guess.
-            An initial guess of 0 results in the best goal value being returned but runs into instability at the end.
-            An initial guess of the current score rarely doesn't return the best goal value, but *does return the best move.
-                *More testing needed to confirm this.
         """
-        # first_guess, best_move = np.int16(0), None
-        first_guess, best_move = self.game.score.calculate(), None
+        key = board._transposition_key() # ? Much faster than python-chess's zobrist hashing
+        color_multiplier = np.int8(1) if board.turn else np.int8(-1) # 1 for white, -1 for black
+
+        first_guess, best_move = np.int16(0), None
         for depth in range(1, DEPTH + 1):
-            first_guess, best_move = self.mtd_fix(board, first_guess) # TODO: Try without
+            # first_guess, best_move = self.mtd_fix(board, first_guess)
+            first_guess, best_move = self.mtd_safe_fix(board, first_guess, color_multiplier, key)
 
         return first_guess, best_move
+
+    def mtd_safe_fix(self, board: chess.Board, first_guess: np.int16, color_multiplier: np.int8, key) -> tuple[np.int16, Optional[chess.Move]]:
+        """
+        MTD(f) search algorithm enhanced with a fix proposed by Jan-Jaap van Horssen in Handling Search Inconsistencies in MTD(f)
+        The algorithm uses a binary search to find the best move.
+        The results are narrowed down, using a null window search.
+        The best move is chosen based off of the SAFE protocol described in the paper Move selection in MTD(f )
+        The fix is to revert to the previous best move, if the last pass failed low and the best move has changed.
+        This prevents the algorithm from returning a move that is worse than the previous best move.
+        It also prevents us from having to clear the transposition table after each iteration.
+        """
+
+        """
+        During each call to the Memory Enhanced Test
+        algorithm, establish an initial principal variation by
+        disabling null move pruning until the first leaf node
+        has been evaluated. This is shown in Figure 3.
+        2. If a node along the principal variation, fails high
+        after the first move fails low, the principal variation
+        has changed. It is possible that this new principal
+        variation contains a null move. Figure 4 shows such
+        a case.
+        3. Perform a re-search from the node where the fail
+        high has occurred. Null move pruning must be
+        disabled for the re-search. Figure 5 shows the
+        resulting search tree after a re-search has removed
+        the null move from the principal variation.
+        """
+
+        gamma = 0 # Overwritten in loop
+        g = first_guess
+        lower_bound, upper_bound = MIN_VALUE, MAX_VALUE
+
+        prev_best_guess, prev_best_move = None, None
+        best_move = None
+        while lower_bound < upper_bound:
+            prev_best_guess, prev_best_move = g, best_move
+
+            gamma = g + 1 if g == lower_bound else g
+
+            g, best_move = self.mt_negamax(board, DEPTH, gamma, color_multiplier, self.game.score)
+            # g, best_move = self.negamax_alpha_beta(board, DEPTH, gamma, gamma + 1, 1 if board.turn else -1, self.game.score)
+
+            if g < gamma:
+                upper_bound = g
+            else: # g >= gamma
+                lower_bound = g
+
+                tt_entry: Optional[TTEntry] = self.transposition_table.get(key)
+                if tt_entry and tt_entry.best_move:
+                    best_move = tt_entry.best_move
+
+        # Needed when using custom starting FENs (needs to warm up the TT table?) TODO: Test more if this is needed
+        if g < gamma and best_move != prev_best_move: # If last pass failed low and best move changed, replace with previous
+            g, best_move = prev_best_guess, prev_best_move
+
+        return g, best_move # type: ignore
 
     def mtd_fix(self, board: chess.Board, first_guess: np.int16) -> tuple[np.int16, Optional[chess.Move]]:
         """
@@ -472,7 +683,7 @@ class ChessBot:
         """
         self.moves_checked = 0
 
-        alpha, beta = float(MIN_VALUE), float(MAX_VALUE)
+        alpha, beta = MIN_VALUE, MAX_VALUE
 
         time_taken: float = 0.0
         best_move: Optional[chess.Move] = chess.Move.null()
@@ -484,9 +695,14 @@ class ChessBot:
         if not best_move: # No book move found, use alpha-beta search
             start_time: float = default_timer() # Start timer
 
+            color_multiplier = 1 if board.turn else -1 # 1 for white, -1 for black
+
             # best_value, best_move = self.alpha_beta(board, DEPTH, alpha, beta, board.turn, self.game.score)
             # best_value, best_move = self.best_node_search(board, alpha, beta, board.turn)
-            best_value, best_move = self.iterative_deepening_mtd_fix(board)
+            best_value, best_move = self.iterative_deepening_mtd_fix_driver(board)
+            # best_value, best_move = self.negamax_alpha_beta(board, DEPTH, alpha, beta, color_multiplier, self.game.score)
+
+            best_value *= color_multiplier
 
             time_taken = default_timer() - start_time # Stop timer
 

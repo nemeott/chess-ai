@@ -124,7 +124,7 @@ class Score: # Positive values favor white, negative values favor black
         # --- Material and Position Scores ---
         for square in chess.SQUARES:
             piece_type = board.piece_type_at(square)
-            if piece_type and piece_type != chess.KING:
+            if piece_type:
                 piece_color = board.color_at(square)
 
                 # Update npm score
@@ -133,13 +133,15 @@ class Score: # Positive values favor white, negative values favor black
 
                 # Update material and position scores
                 if piece_color: # White piece
-                    material += _piece_values[piece_type]
+                    if piece_type != chess.KING:
+                        material += int(_piece_values[piece_type])
                     mg += _mg_tables[piece_type][_flip(square)] # type: ignore
                     eg += _eg_tables[piece_type][_flip(square)] # type: ignore
                     if piece_type == chess.BISHOP:
                         white_bishop_count += 1
                 else: # Black piece
-                    material -= _piece_values[piece_type]
+                    if piece_type != chess.KING:
+                        material -= int(_piece_values[piece_type])
                     mg -= _mg_tables[piece_type][square] # type: ignore
                     eg -= _eg_tables[piece_type][square] # type: ignore
                     if piece_type == chess.BISHOP:
@@ -172,9 +174,9 @@ class Score: # Positive values favor white, negative values favor black
                 adjacent_mask |= file_masks[file + 1] # Append right file to mask
 
             # Check for isolated pawns (no pawns in adjacent files)
-            if white_pawns_in_file > 0 and chess.popcount(white_pawns & adjacent_mask) == 0:
+            if white_pawns_in_file > 0 and white_pawns & adjacent_mask == 0:
                 pawn_struct -= ISOLATED_PAWN_PENALTY # Isolated white pawn penalty
-            if black_pawns_in_file > 0 and chess.popcount(black_pawns & adjacent_mask) == 0:
+            if black_pawns_in_file > 0 and black_pawns & adjacent_mask == 0:
                 pawn_struct += ISOLATED_PAWN_PENALTY # Isolated black pawn penalty
 
             # Check for doubled pawns

@@ -1,7 +1,7 @@
 import chess
 import chess.svg
 from board import ChessBoard
-from bot2 import ChessBot
+from bot3 import ChessBot
 from score import Score
 from human import HumanPlayer
 import pygame
@@ -15,13 +15,13 @@ from constants import IS_BOT, UPDATE_DELAY_MS, LAST_MOVE_ARROW, CHECKING_MOVE_AR
 
 
 class ChessGame:
-    __slots__ = ["board", "checking_move", "last_move", "last_update_time", "score", "white_player", "black_player", "piece_images",
-                 "square_colors", "highlighted_square_color", "WINDOW_SIZE", "screen", "empty_board_surface", "last_board_state"]
+    __slots__ = ["board", "arrow_move", "last_move", "last_update_time", "score", "white_player", "black_player", "piece_images",
+                 "square_colors", "highlighted_square_color", "WINDOW_SIZE", "screen", "last_board_state", "empty_board_surface"]
 
     def __init__(self):
         self.board = ChessBoard()
 
-        self.checking_move: Optional[chess.Move] = None # Current move to check
+        self.arrow_move: Optional[chess.Move] = None # Current move to draw an arrow for
         self.last_move: Optional[chess.Move] = None # Last move played
         self.last_update_time: int = pygame.time.get_ticks()
 
@@ -152,10 +152,10 @@ class ChessGame:
             # Using solid blue to match SVG arrow color
             self.draw_arrow(surface, last_move.from_square, last_move.to_square, pygame.Color("#0000FF"))
 
-        if CHECKING_MOVE_ARROW and self.checking_move:
+        if CHECKING_MOVE_ARROW and self.arrow_move:
             # Using solid red to match SVG arrow color
-            self.draw_arrow(surface, self.checking_move.from_square,
-                            self.checking_move.to_square, pygame.Color("#FF0000"))
+            self.draw_arrow(surface, self.arrow_move.from_square,
+                            self.arrow_move.to_square, pygame.Color("#FF0000"))
 
             return surface
 
@@ -225,7 +225,7 @@ class ChessGame:
             if current_time - self.last_update_time < UPDATE_DELAY_MS:
                 return
 
-        if CHECKING_MOVE_ARROW and self.checking_move:
+        if CHECKING_MOVE_ARROW and self.arrow_move:
             # Use fast direct rendering during AI analysis
             board_surface = self.fast_render_board(last_move, selected_square)
             if board_surface is not None:
@@ -248,10 +248,10 @@ class ChessGame:
                     last_move.to_square,
                     color="#0000FF" # Blue color, solid
                 ))
-            if CHECKING_MOVE_ARROW and self.checking_move:
+            if CHECKING_MOVE_ARROW and self.arrow_move:
                 arrows.append(chess.svg.Arrow(
-                    self.checking_move.from_square,
-                    self.checking_move.to_square,
+                    self.arrow_move.from_square,
+                    self.arrow_move.to_square,
                     color="#FF0000" # Red for checked move, solid
                 ))
 
@@ -281,7 +281,7 @@ class ChessGame:
 
         # Warm up numba calculate function (compile)
         _ = Score()
-        _ = _.updated(self.board.get_board_state(), chess.Move.from_uci("e2e4"))
+        _ = _.calculate()
 
         while not self.board.is_game_over():
             print(

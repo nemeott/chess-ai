@@ -1,12 +1,13 @@
 import chess
 import pygame
 
+
 class HumanPlayer:
     def __init__(self, game, color: chess.Color) -> None:
         self.game = game # Store reference to game for redrawing
         self.color = color
         self.selected_square = None
-        
+
     def get_square_from_coords(self, x, y, flipped=False):
         """Convert screen coordinates to chess square."""
         file_idx = x * 8 // 600
@@ -33,11 +34,11 @@ class HumanPlayer:
         import cairosvg # type: ignore[import-untyped]
         import io
         from PIL import Image
-        
+
         pygame.font.init()
         font = pygame.font.Font(None, 36)
         screen = pygame.display.get_surface()
-        
+
         # Define piece options
         pieces = [
             (chess.QUEEN, "Queen"),
@@ -45,20 +46,20 @@ class HumanPlayer:
             (chess.BISHOP, "Bishop"),
             (chess.KNIGHT, "Knight")
         ]
-        
+
         # Calculate button dimensions and positions
         button_width = 200
         button_height = 80
         button_margin = 10
         total_height = (button_height + button_margin) * len(pieces)
         start_y = (600 - total_height) // 2 # Center vertically in 600x600 window
-        
+
         # Create semi-transparent overlay
         overlay = pygame.Surface((600, 600))
         overlay.fill((0, 0, 0))
         overlay.set_alpha(128)
         screen.blit(overlay, (0, 0))
-        
+
         # Function to convert SVG to Pygame surface
         def svg_to_pygame_surface(svg_string, size):
             png_data = cairosvg.svg2png(bytestring=svg_string.encode('utf-8'))
@@ -70,11 +71,11 @@ class HumanPlayer:
             size = image.size
             data = image.tobytes()
             return pygame.image.fromstring(data, size, mode) # type: ignore
-        
+
         # Draw buttons and store their rectangles
         buttons = []
         current_y = start_y
-        
+
         for piece_type, piece_name in pieces:
             # Create button rectangle
             button_rect = pygame.Rect(
@@ -83,33 +84,33 @@ class HumanPlayer:
                 button_width,
                 button_height
             )
-            
+
             # Draw button background
             pygame.draw.rect(screen, (240, 240, 240), button_rect)
             pygame.draw.rect(screen, (100, 100, 100), button_rect, 2) # Border
-            
+
             # Generate piece SVG
-            piece_svg = chess.svg.piece(chess.Piece(piece_type, self.color), size=button_height-20)
-            piece_surface = svg_to_pygame_surface(piece_svg, button_height-20)
-            
+            piece_svg = chess.svg.piece(chess.Piece(piece_type, self.color), size=button_height - 20)
+            piece_surface = svg_to_pygame_surface(piece_svg, button_height - 20)
+
             # Calculate positions for piece icon and text
             piece_x = button_rect.left + 20
             piece_y = button_rect.top + 10
             text_x = piece_x + button_height # Position text after the piece icon
-            
+
             # Draw piece icon
             screen.blit(piece_surface, (piece_x, piece_y))
-            
+
             # Draw text
             text = font.render(piece_name, True, (0, 0, 0))
             text_rect = text.get_rect(midleft=(text_x, button_rect.centery))
             screen.blit(text, text_rect)
-            
+
             buttons.append((button_rect, piece_type))
             current_y += button_height + button_margin
-        
+
         pygame.display.flip()
-        
+
         # Wait for valid choice
         while True:
             event = pygame.event.wait()
@@ -120,33 +121,34 @@ class HumanPlayer:
                 for button_rect, piece_type in buttons:
                     if button_rect.collidepoint(mouse_pos):
                         return piece_type
-        
+
     def get_move(self, board: chess.Board):
         """Get move from human player through GUI interaction."""
         # Removed pygame.event.clear() to avoid discarding important events
-        
+
         while True:
             event = pygame.event.wait()
-            
+
             if event.type == pygame.QUIT:
                 return None
-                
+
             if event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = event.pos
                 square = self.get_square_from_coords(x, y, self.color == chess.BLACK)
-                
+
                 if self.selected_square is None:
                     # First click - select piece
                     piece = board.piece_at(square)
                     if piece and piece.color == self.color:
                         self.selected_square = square
                         # Immediately redraw board with highlighted square
-                        self.game.display_board(last_move=self.game.last_move, selected_square=self.selected_square, force_update=True)
+                        self.game.display_board(last_move=self.game.last_move,
+                                                selected_square=self.selected_square, force_update=True)
                 else:
                     # Second click - try to make move
                     from_square = self.selected_square
                     to_square = square
-                    
+
                     # Check if this is a promotion move
                     if self.is_promotion_move(board, from_square, to_square):
                         promotion_piece = self.get_promotion_choice()
@@ -156,16 +158,22 @@ class HumanPlayer:
                         move = chess.Move(from_square, to_square, promotion=promotion_piece)
                     else:
                         move = chess.Move(from_square, to_square)
-                    
+
                     # Check if move is legal
                     if move in board.legal_moves:
                         self.selected_square = None
+                        if board.is_castling(move): # Change castling move's to_square to the empty square, not the rook's square
+                            match move.uci():
+                                case "e1h1": # White castle kingside
+                                    move = chess.Move(chess.E1, chess.G1)
+                                case "e1a1": # White castle queenside
+                                    move = chess.Move(chess.E1, chess.C1)
+                                case "e8h8": # Black castle kingside
+                                    move = chess.Move(chess.E8, chess.G8)
+                                case "e8a8": # Black castle queenside
+                                    move = chess.Move(chess.E8, chess.C8)
                         self.game.score = self.game.score.updated(board, move) # Update static eval score
                         return move
-                    
+
                     # If illegal move, clear selection
                     self.selected_square = None
-        
-
-
-        return None

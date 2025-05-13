@@ -129,6 +129,7 @@ if __name__ == "__main__":
     fen10 = "8/8/3kpNp1/4N3/4bKP1/6P1/2p5/3r4 b - - 1 52"
     board10 = test_position(fen10, "c2c1q") # Pawn promotes to queen
 
+    # Position 11:
     fen11 = "r1bqkb1r/pppp1p1p/4p1pQ/4P3/3P4/8/PPP2nPP/RNB1KBNR w KQkq - 2 10"
     board11 = test_position(fen11, "e1f2")
 
@@ -138,7 +139,12 @@ if __name__ == "__main__":
 
     _ = score.calculate()
 
+    import numpy as np
+
     start_time = default_timer()
+
+    a = np.int8(-1)
+    b = np.int16(3492)
 
     n = 1_000_000
     for i in range(n):
