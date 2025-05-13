@@ -1,6 +1,5 @@
 import chess
 import chess.svg
-from board import ChessBoard
 from bot3 import ChessBot
 from score import Score
 from human import HumanPlayer
@@ -11,15 +10,18 @@ from PIL import Image
 import math # For quick render arrows
 from typing import Literal, Optional
 
-from constants import IS_BOT, UPDATE_DELAY_MS, LAST_MOVE_ARROW, CHECKING_MOVE_ARROW, BREAK_TURN, WHITE_USE_OPENING_BOOK, BLACK_USE_OPENING_BOOK
+from constants import STARTING_FEN, IS_BOT, UPDATE_DELAY_MS, LAST_MOVE_ARROW, CHECKING_MOVE_ARROW, BREAK_TURN, WHITE_USE_OPENING_BOOK, BLACK_USE_OPENING_BOOK
 
 
 class ChessGame:
-    __slots__ = ["board", "arrow_move", "last_move", "last_update_time", "score", "white_player", "black_player", "piece_images",
+    __slots__ = ["board", "arrow_move", "last_move", "last_update_time", "white_player", "black_player", "piece_images",
                  "square_colors", "highlighted_square_color", "WINDOW_SIZE", "screen", "last_board_state", "empty_board_surface"]
 
     def __init__(self):
-        self.board = ChessBoard()
+        if STARTING_FEN:
+            self.board = chess.Board(STARTING_FEN)
+        else:
+            self.board = chess.Board()
 
         self.arrow_move: Optional[chess.Move] = None # Current move to draw an arrow for
         self.last_move: Optional[chess.Move] = None # Last move played
@@ -27,14 +29,11 @@ class ChessGame:
 
         # Initialize players based on IS_BOT flag
         if IS_BOT:
-            self.white_player = ChessBot(self, WHITE_USE_OPENING_BOOK)
-            self.black_player = ChessBot(self, BLACK_USE_OPENING_BOOK)
+            self.white_player = ChessBot(WHITE_USE_OPENING_BOOK)
+            self.black_player = ChessBot(BLACK_USE_OPENING_BOOK)
         else:
             self.white_player = HumanPlayer(self, chess.WHITE)
-            self.black_player = ChessBot(self, BLACK_USE_OPENING_BOOK)
-
-        self.score = Score()
-        self.score.initialize(self.board.get_board_state()) # Initialize scores once and update from there
+            self.black_player = ChessBot(BLACK_USE_OPENING_BOOK)
 
         # Cache for piece images and board squares
         self.piece_images = {}
@@ -114,7 +113,7 @@ class ChessGame:
 
     def fast_render_board(self, last_move=None, selected_square=None):
         """Render chess board using cached empty board and pieces"""
-        board_state = self.board.get_board_state()
+        board_state = self.board
         square_size = self.WINDOW_SIZE // 8
 
         # Start with a copy of the empty board
@@ -257,7 +256,7 @@ class ChessGame:
 
             # Create SVG with highlighted last move and selected square
             svg = chess.svg.board(
-                board=self.board.get_board_state(),
+                board=self.board,
                 lastmove=last_move,
                 squares=highlight_squares,
                 arrows=arrows,
@@ -279,75 +278,82 @@ class ChessGame:
         """Main game loop"""
         print("--------------------------------------------------------------")
 
+        score = Score()
+        score.initialize(self.board) # Initialize scores once and update from there
+
         # Warm up numba calculate function (compile)
         _ = Score()
         _ = _.calculate()
 
         while not self.board.is_game_over():
             print(
-                f"Player: {'White' if self.board.get_board_state().turn else 'Black'} - {self.board.get_board_state().fullmove_number}")
-
-            # Get current player for selected square highlighting
-            current_player = self.white_player if self.board.get_board_state().turn else self.black_player
-            selected_square = getattr(current_player, 'selected_square', None)
-
-            # Display current board with highlights
-            self.display_board(self.last_move, selected_square, force_update=True)
+                f"Player: {'White' if self.board.turn else 'Black'} - {self.board.fullmove_number}")
 
             # Determine current player
-            current_player = self.white_player if self.board.get_board_state().turn else self.black_player
+            current_player = self.white_player if self.board.turn else self.black_player
+
+            # Display current board with highlights
+            selected_square = getattr(current_player, 'selected_square', None)
+            self.display_board(self.last_move, selected_square, force_update=True)
+
+            # Get actual score and update it for the current player
+            score.initialize(self.board)
+            current_player.set_score(score)
 
             # Get player's move
-            move = current_player.get_move(self.board.get_board_state())
+            move = current_player.get_move(self.board)
 
             if move is None:
                 print("Game ended by player")
                 break
 
             # Make the move
-            if not self.board.make_move(move):
+            if move in self.board.legal_moves:
+                self.board.push(move)
+            else:
                 print(f"Illegal move attempted: {move}")
                 break
 
-            incremental_score = self.score
-            incremental = self.score.calculate()
+            incremental_score = current_player.get_score()
+            if incremental_score: # If no incremental score, current player is human
+                incremental_value = incremental_score.calculate()
 
-            # Test if cached score is correct
-            actual_score = Score()
-            actual_score.initialize(self.board.get_board_state())
-            actual = actual_score.calculate()
+                # Test if cached score is correct
+                actual_score = Score()
+                actual_score.initialize(self.board)
+                actual_value = actual_score.calculate()
 
-            print(f"Eval: {incremental}, {actual}")
+                print(f"Eval: {incremental_value}, {actual_value}")
 
-            print(f"Move played: {move}")
+                print(f"Move played: {move}")
 
-            # Assert scores match
-            assert (incremental_score.material ==
-                    actual_score.material), f"Material score mismatch: {incremental_score.material} != {actual_score.material}"
-            assert (incremental_score.mg ==
-                    actual_score.mg), f"Midgame score mismatch: {incremental_score.mg} != {actual_score.mg}"
-            assert (incremental_score.eg ==
-                    actual_score.eg), f"Endgame score mismatch: {incremental_score.eg} != {actual_score.eg}"
-            assert (incremental_score.npm ==
-                    actual_score.npm), f"Non-pawn material score mismatch: {incremental_score.npm} != {actual_score.npm}"
-            assert (incremental_score.pawn_struct ==
-                    actual_score.pawn_struct), f"Pawn structure score mismatch: {incremental_score.pawn_struct} != {actual_score.pawn_struct}"
-            assert (incremental_score.king_safety ==
-                    actual_score.king_safety), f"King safety score mismatch: {incremental_score.king_safety} != {actual_score.king_safety}"
+                # Assert scores match
+                assert (incremental_score.material ==
+                        actual_score.material), f"Material score mismatch: {incremental_score.material} != {actual_score.material}"
+                assert (incremental_score.mg ==
+                        actual_score.mg), f"Midgame score mismatch: {incremental_score.mg} != {actual_score.mg}"
+                assert (incremental_score.eg ==
+                        actual_score.eg), f"Endgame score mismatch: {incremental_score.eg} != {actual_score.eg}"
+                assert (incremental_score.npm ==
+                        actual_score.npm), f"Non-pawn material score mismatch: {incremental_score.npm} != {actual_score.npm}"
+                assert (incremental_score.pawn_struct ==
+                        actual_score.pawn_struct), f"Pawn structure score mismatch: {incremental_score.pawn_struct} != {actual_score.pawn_struct}"
+                assert (incremental_score.king_safety ==
+                        actual_score.king_safety), f"King safety score mismatch: {incremental_score.king_safety} != {actual_score.king_safety}"
 
-            assert (incremental == actual), f"Score mismatch: {incremental} != {actual}"
+                assert (incremental_value == actual_value), f"Score mismatch: {incremental_value} != {actual_value}"
 
             print("--------------------------------------------------------------")
             self.last_move = move
 
-            if BREAK_TURN and self.board.get_board_state().fullmove_number > BREAK_TURN:
+            if BREAK_TURN and self.board.fullmove_number > BREAK_TURN:
                 pygame.quit()
                 return
 
         # Display final position
         self.display_board(self.last_move, force_update=True)
-        print(f"Number of turns: {self.board.get_board_state().fullmove_number}") # Print number of turns
-        result = self.board.get_result()
+        print(f"Number of turns: {self.board.fullmove_number}") # Print number of turns
+        result = self.board.outcome()
         print(f"Game Over! Result: {result}")
 
         running = True

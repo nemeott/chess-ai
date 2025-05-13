@@ -2,11 +2,17 @@ import chess
 import pygame
 
 
-class HumanPlayer:
+class HumanPlayer: # TODO: Heavily refactor
     def __init__(self, game, color: chess.Color) -> None:
         self.game = game # Store reference to game for redrawing
         self.color = color
         self.selected_square = None
+
+    def set_score(self, score):
+        pass
+
+    def get_score(self):
+        return None
 
     def get_square_from_coords(self, x, y, flipped=False):
         """Convert screen coordinates to chess square."""
@@ -172,7 +178,6 @@ class HumanPlayer:
                                     move = chess.Move(chess.E8, chess.G8)
                                 case "e8a8": # Black castle queenside
                                     move = chess.Move(chess.E8, chess.C8)
-                        self.game.score = self.game.score.updated(board, move) # Update static eval score
                         return move
 
                     # If illegal move, clear selection

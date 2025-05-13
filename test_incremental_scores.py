@@ -143,7 +143,7 @@ if __name__ == "__main__":
 
     start_time = default_timer()
 
-    a = np.int8(-1)
+    a = np.int16(-13212)
     b = np.int16(3492)
 
     n = 1_000_000
@@ -151,6 +151,8 @@ if __name__ == "__main__":
         new_score = score.updated(board, chess.Move.from_uci("b5c7"))
         calculated = new_score.calculate()
         # calculated = score.numpy_calculate(board)
+        d = np.maximum(a, b)
+        c = np.int16(max(int(a), int(b)))
         if i % 100_000 == 0:
             print(f"Score after {i} moves: {calculated}")
 
