@@ -315,7 +315,6 @@ class ChessBot:
         Scores are incrementally updated based on the move.
         Returns the best value and move for the current player.
         """
-
         # Terminal node check
         if depth == 0:
             value = color_multiplier * self.evaluate_position(board, score)
@@ -713,7 +712,7 @@ class ChessBot:
 
             time_taken = default_timer() - start_time # Stop timer
 
-            print(f"Goal value: {best_value}")
+            # print(f"Goal value: {best_value}")
 
         if best_move is None:
             legal_moves = list(board.generate_legal_moves())
@@ -726,7 +725,7 @@ class ChessBot:
 
         self.score = self.score.updated(board, best_move) # type: ignore
 
-        self.print_stats(board, time_taken)
+        # self.print_stats(board, time_taken)
 
         return best_move
 
@@ -742,7 +741,7 @@ class ChessBot:
         #       f"{colors.BOLD}{colors.get_move_time_color(time_taken)}{time_taken:.2f}{colors.RESET} s = "
         #       f"{colors.BOLD}{colors.CYAN}{time_per_move * 1000:.4f}{colors.RESET} ms/M, "
         #       f"{colors.BOLD}{colors.CYAN}{moves_per_second:,.0f}{colors.RESET} M/s")
-        print(f"Moves: {colors.BOLD}{colors.get_moves_color(self.moves_checked)}{self.moves_checked:,}{colors.RESET}")
+        print(f"Moves checked: {colors.BOLD}{colors.get_moves_color(self.moves_checked)}{self.moves_checked:,}{colors.RESET}")
 
         # Calculate memory usage more accurately
         tt_entry_size = getsizeof(TTEntry(np.int8(0), np.int16(0), EXACT, chess.Move.from_uci("e2e4")), 64)
