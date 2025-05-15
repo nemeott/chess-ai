@@ -121,7 +121,7 @@ W-W-D:
 Negamax vs Negamax: 10-10-28 (Fivefold draws)
 Negamax vs Negamax Late Terminal Check: 10-9-29 (Fivefold draws)
 Negamax vs Negamax Store Terminal: 9-10-29 (Fivefold draws)
-Negamax vs Negamax No Repetition Version 1:
+Negamax vs Negamax No Repetition V2:
 
 : 
 Negamax No Repetition vs Negamax No Repetition: 

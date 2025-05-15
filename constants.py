@@ -9,6 +9,7 @@ from numpy.typing import NDArray # Add this import at the top of the file if not
 STARTING_FEN: Optional[str] = None
 # STARTING_FEN: Optional[str] = "r1b1r1k1/ppN2qbp/6p1/3p4/5B2/3p2P1/PPPK1p1P/R4Q1B w - - 0 25"
 # STARTING_FEN: Optional[str] = "1r2k1r1/2pp1p1p/4pBp1/2q1P3/1pN5/1R1B1NPP/2P3K1/8 b - - 1 35" # Repetition test
+# STARTING_FEN: Optional[str] = "8/7R/6pK/4B3/4P2P/3p4/2k1r3/6r1 w - - 9 45"
 
 MAX_VALUE: np.int16 = np.int16(32767) # 2**(16-1) - 1 (max value for 16 bit integer)
 # -2**(16-1) (min value for 16 bit integer) (technically -32768, but we use 32767 to avoid overflow)
@@ -21,7 +22,7 @@ LAST_MOVE_ARROW: bool = True # Set to True to display last move arrow
 TT_SIZE: np.int8 = np.int8(32) # Size of the transposition table (in MB)
 
 # --- Search Settings ---
-DEPTH: np.int8 = np.int8(4) # Search depth for the minimax algorithm
+DEPTH: np.int8 = np.int8(5) # Search depth for the minimax algorithm
 
 # --- Polyglot Book Settings ---
 # Book from: https://sourceforge.net/projects/codekiddy-chess/files/Books/Polyglot%20books/Update1/

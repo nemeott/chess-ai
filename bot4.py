@@ -26,7 +26,7 @@ class ChessBot:
     Class to represent the chess bot.
     """
     __slots__ = ["score", "moves_checked", "quiescence_moves_checked",
-                 "transposition_table", "history", "root_halfmove_clock", "opening_book"] # Optimization for fast lookups
+                 "transposition_table", "history", "root_halfmove_clock", "killer_moves", "opening_book"] # Optimization for fast lookups
 
     def __init__(self, use_opening_book: bool = True) -> None: # TODO: Add verbose/print option
         """
@@ -44,6 +44,8 @@ class ChessBot:
 
         self.history: sllist = sllist() # History table for detecting repetitions
         self.root_halfmove_clock: int = 0 # Root halfmove clock
+
+        self.killer_moves: list[list[chess.Move]] = [[], []] # Killer moves for alpha-beta pruning
 
         # Initialize opening book
         self.opening_book = None
@@ -66,51 +68,42 @@ class ChessBot:
         #     self.game.arrow_move = move
         #     self.game.display_board(self.game.last_move) # Update display
 
-    def is_repetition(self, board: chess.Board, key: Hashable) -> bool:
-        # # Check for repetitions
-        # halfmove_clock = board.halfmove_clock
-        # if halfmove_clock >= 4: # Three-fold repetition possible, need to check
-        #     root_halfmove_clock = self.root_halfmove_clock
-        #     repetitions = 0
-        #     if key in self.history: return True
-        #     for i, move_key in enumerate(self.history):
-        #         if move_key == key: # Only check our moves (history starts at the position from opponent's last move)
-        #             repetitions += 1
+    def is_repetition(self, board: chess.Board, key: Hashable, depth: np.int8) -> bool:
+        """
+        Check if the current position is a repetition.
+        The first move in history at this point is the position from the opponent's last move.
+        """
+        # Check for repetitions
+        halfmove_clock = board.halfmove_clock
+        if halfmove_clock >= 4: # Three-fold repetition possible, need to check
+            root_halfmove_clock = self.root_halfmove_clock
+            repetitions = 0
+            for i, move_key in enumerate(self.history):
+                if i % 2 == 1 and move_key == key: # Only check our moves (history starts at the position from opponent's last move)
+                    return True
+                
+                    # # TODO: Figure out why actual repetition logic is not preventing repetitions
+                    # repetitions += 1
 
-        #             if repetitions == 2: # This is the 3rd repetition
-        #                 return True
-        #             elif repetitions == 1 and halfmove_clock > root_halfmove_clock + 2: # Prevent treating moves close to root as draws
-        #                 return True
+                    # if repetitions == 2: # This is the 3rd repetition
+                    #     return True
+                    # # ply > root_ply + 2
+                    # elif repetitions == 1 and DEPTH - depth > 2: # Prevent treating moves close to root as draws
+                    #     return True
 
-        #         if i > halfmove_clock: # Reached the last irreversible move
-        #             break
+                if i >= halfmove_clock: # Reached the last irreversible move
+                    break
 
         return False
 
-    def evaluate_position(self, board: chess.Board, score: Score, key: Hashable, has_legal_moves: bool = True) -> np.int16:
-        """
-        Evaluate the current position.
-        Positive values favor white, negative values favor black.
-        TODO: "Actually, the rule is 'if you are ahead in material, trade pieces but not pawns.
-            If you are behind in material, trade pawns and not pieces.'"
-        """
-        # Check expensive operations once
-        if has_legal_moves:
-            has_legal_moves = any(board.generate_legal_moves()) # ! SLOW
-
-        # Evaluate game-ending conditions
-        if not has_legal_moves: # No legal moves
-            if board.is_check(): # Checkmate
-                return MIN_VALUE if board.turn else MAX_VALUE
-            return np.int16(0) # Stalemate
-        elif board.is_insufficient_material():
-            return np.int16(0)
-        elif board.can_claim_fifty_moves(): # Avoid fifty move rule
-            return np.int16(0)
-        elif self.is_repetition(board, key):
-            return np.int16(0)
-
-        return score.calculate()
+    # def evaluate_position(self, board: chess.Board, score: Score, key: Hashable, has_legal_moves: bool = True) -> np.int16:
+    #     """
+    #     Evaluate the current position.
+    #     Positive values favor white, negative values favor black.
+    #     TODO: "Actually, the rule is 'if you are ahead in material, trade pieces but not pawns.
+    #         If you are behind in material, trade pawns and not pieces.'"
+    #     """
+    #     return score.calculate()
 
     def ordered_moves_generator(self, board: chess.Board, tt_move: Optional[chess.Move]) -> Generator[chess.Move, None, None]:
         """
@@ -146,12 +139,16 @@ class ChessBot:
                         victim_piece_type = _piece_type_at(move.to_square - (color_multiplier * 8))
                         score += 5 # Small bonus for en passant captures
 
+                    # TODO: Sort good vs bad captures
                     # Prioritize capturing higher value pieces using lower value pieces
                     score += 10_000 + int(_piece_values[victim_piece_type] - # type: ignore
                                           _piece_values[attacker_piece_type]) # type: ignore
 
+                # if move in self.killer_moves:
+                #     score += 1_000
+
                 if move.promotion: # Promotion bonus
-                    score += 1_000 + _piece_values[move.promotion] - _piece_values[chess.PAWN]
+                    score += 100 + _piece_values[move.promotion] - _piece_values[chess.PAWN]
 
                 # if score == 0 and board.gives_check(move): # ! SLOW
                 #     score += 100
@@ -263,13 +260,13 @@ class ChessBot:
 
         # If position is in transposition table and depth is sufficient
         tt_move = None
-        if tt_entry:
-            tt_move = tt_entry.best_move # Save best TT move (use later in move ordering)
-            if tt_entry.depth >= depth:
-                if tt_entry.flag == LOWERBOUND and tt_entry.value >= gamma:
-                    return tt_entry.value, tt_move
-                elif tt_entry.flag == UPPERBOUND and tt_entry.value < gamma:
-                    return tt_entry.value, tt_move
+        # if tt_entry:
+        #     tt_move = tt_entry.best_move # Save best TT move (use later in move ordering)
+        #     if tt_entry.depth >= depth:
+        #         if tt_entry.flag == LOWERBOUND and tt_entry.value >= gamma:
+        #             return tt_entry.value, tt_move
+        #         elif tt_entry.flag == UPPERBOUND and tt_entry.value < gamma:
+        #             return tt_entry.value, tt_move
 
         # Cache functions for faster lookups
         _mt_negamax = self.mt_negamax
@@ -343,10 +340,23 @@ class ChessBot:
         Returns the best value and move for the current player.
         """
         key: Hashable = board._transposition_key() # ? Much faster
-        
+
+        # Evaluate game-ending conditions
+        best_move = next(board.generate_legal_moves(), None) # Get first move
+        if not best_move: # No legal moves
+            if board.is_check(): # Checkmate
+                return (MIN_VALUE, None) if color_multiplier == 1 else (MAX_VALUE, None)
+            return np.int16(0), None # Stalemate
+        elif board.is_insufficient_material():
+            return np.int16(0), None
+        elif board.can_claim_fifty_moves(): # Avoid fifty move rule
+            return np.int16(0), None
+        elif self.is_repetition(board, key, depth): # Avoid threefold repetition
+            return np.int16(0), None
+
         # Terminal node check
         if depth == 0:
-            value = color_multiplier * self.evaluate_position(board, score, key)
+            value = color_multiplier * score.calculate()
             # self.transposition_table[key] = TTEntry(depth, value, EXACT, None) # ? Slowish
             return value, None # No move to return
             # return self.quiescence(board, 3, alpha, beta, score), None # No move to return
@@ -359,13 +369,12 @@ class ChessBot:
         if tt_entry:
             tt_move = tt_entry.best_move
             if tt_entry.depth >= depth:
-                if not self.is_repetition(board, key): # Check for repetitions
-                    if tt_entry.flag == EXACT:
-                        return tt_entry.value, tt_move
-                    elif tt_entry.flag == LOWERBOUND and tt_entry.value >= beta:
-                        return tt_entry.value, tt_move
-                    elif tt_entry.flag == UPPERBOUND and tt_entry.value <= alpha:
-                        return tt_entry.value, tt_move
+                if tt_entry.flag == EXACT:
+                    return tt_entry.value, tt_move
+                elif tt_entry.flag == LOWERBOUND and tt_entry.value >= beta:
+                    return tt_entry.value, tt_move
+                elif tt_entry.flag == UPPERBOUND and tt_entry.value <= alpha:
+                    return tt_entry.value, tt_move
 
         # Cache functions for faster lookups
         _push = board.push
@@ -373,20 +382,18 @@ class ChessBot:
         _score_updated = score.updated
         _increment_moves_and_render_arrow = self.increment_moves_and_render_debug_arrow
 
-
         original_alpha = alpha
 
-        best_move = None
+        self.history.appendleft(key) # Add position to history
+
         best_value: np.int16 = MIN_VALUE
         for move in self.ordered_moves_generator(board, tt_move):
             _increment_moves_and_render_arrow(depth, move) # TODO: Move increment outside to start of alpha-beta
 
             updated_score: Score = _score_updated(board, move)
             _push(move)
-            self.history.appendleft(board._transposition_key()) # Add position to history
             value: np.int16 = -self.negamax_alpha_beta(board, depth - 1, -beta, -alpha,
                                                        -color_multiplier, updated_score)[0]
-            self.history.popleft() # Remove position from history
             _pop()
 
             if value > best_value: # Get new best value and move
@@ -394,6 +401,8 @@ class ChessBot:
                 alpha = np.int16(max(int(alpha), int(best_value))) # Get new alpha
                 if alpha >= beta:
                     break # Beta cutoff (fail-high: opponent won't allow this position)
+
+        self.history.popleft() # Remove position from history
 
         # Store position in transposition table
         if best_value <= original_alpha:
@@ -405,7 +414,7 @@ class ChessBot:
 
         self.transposition_table[key] = TTEntry(depth, best_value, flag, best_move)
 
-
+        assert best_move is not None
         return best_value, best_move
 
         # # --- Null Move Pruning ---
@@ -721,8 +730,12 @@ class ChessBot:
         """
         Main method to get the best move for the current player.
         """
-        # Add position to the history table
-        self.history.appendleft(board._transposition_key())
+        if board.fen() == "8/7R/6pK/4B3/4P2P/3p4/2k1r3/6r1 w - - 9 45":
+            a = 2
+
+        key = board._transposition_key()
+
+        # Set the root halfmove clock
         self.root_halfmove_clock = board.halfmove_clock
 
         self.moves_checked = 0
@@ -750,28 +763,31 @@ class ChessBot:
 
             time_taken = default_timer() - start_time # Stop timer
 
-            print(f"Goal value: {best_value}")
+            # print(f"Goal value: {best_value}")
 
         if best_move is None:
             legal_moves = list(board.generate_legal_moves())
             if len(legal_moves) > 0:
                 print(f"{colors.RED}No best move returned, using first legal move{colors.RESET}")
-                print(f"FEN: {board.fen()}")
+                print(f"Had {len(legal_moves)} legal moves")
                 print(f"Legal moves: {legal_moves}")
+                print(f"FEN: {board.fen()}")
                 best_move = legal_moves[0]
             else:
                 print(f"{colors.RED}No best move returned{colors.RESET}")
                 print(f"{colors.RED}Legal moves: {legal_moves}{colors.RESET}")
-                quit()
+            quit()
 
         self.score = self.score.updated(board, best_move) # type: ignore
 
-        self.print_stats(board, time_taken)
-
-        # Add new position to the history table
+        # Add start pos and end pos to history
+        self.history.appendleft(key) # Add position to history
         board.push(best_move)
-        self.history.appendleft(board._transposition_key())
+        # print(self.is_repetition(board, board._transposition_key()))
+        self.history.appendleft(board._transposition_key()) # Add position to history
         board.pop()
+
+        # self.print_stats(board, time_taken)
 
         return best_move
 
