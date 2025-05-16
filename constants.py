@@ -7,6 +7,9 @@ from numpy.typing import NDArray # Add this import at the top of the file if not
 
 # Set to None for standard starting position, or FEN string for custom starting position
 STARTING_FEN: Optional[str] = None
+# STARTING_FEN: Optional[str] = "2r1nrk1/p2q1ppp/bp1p4/n1pPp3/P1P1P3/2PBB1N1/4QPPP/R4RK1 w - - 0 1"
+# STARTING_FEN: Optional[str] = "2q1rr1k/3bbnnp/p2p1pp1/2pPp3/PpP1P1P1/1P2BNNP/2BQ1PRK/7R b - - 0 1"
+# STARTING_FEN: Optional[str] = "4Q3/5Q1Q/3Q4/8/6k1/6P1/5Q2/6K1 b - - 6 120" # Easy checkmate
 # STARTING_FEN: Optional[str] = "r1b1r1k1/ppN2qbp/6p1/3p4/5B2/3p2P1/PPPK1p1P/R4Q1B w - - 0 25"
 # STARTING_FEN: Optional[str] = "1r2k1r1/2pp1p1p/4pBp1/2q1P3/1pN5/1R1B1NPP/2P3K1/8 b - - 1 35" # Repetition test
 # STARTING_FEN: Optional[str] = "8/7R/6pK/4B3/4P2P/3p4/2k1r3/6r1 w - - 9 45"

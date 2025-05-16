@@ -678,7 +678,6 @@ class ChessBot:
             color_multiplier = np.int8(1) if board.turn else np.int8(-1) # 1 for white, -1 for black
             # best_value, best_move = self.best_node_search(board, alpha, beta, board.turn)
 
-            # best_value, best_move = self.alpha_beta(board, DEPTH, alpha, beta, board.turn, self.score)
             best_value, best_move = self.negamax_alpha_beta(board, DEPTH, alpha, beta, color_multiplier, self.score)
             # best_value, best_move = self.iterative_deepening_mtd_fix_driver(board)
 
