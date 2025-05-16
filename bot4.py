@@ -79,9 +79,10 @@ class ChessBot:
             root_halfmove_clock = self.root_halfmove_clock
             repetitions = 0
             for i, move_key in enumerate(self.history):
-                if i % 2 == 1 and move_key == key: # Only check our moves (history starts at the position from opponent's last move)
+                # Only check our moves (history starts at the position from opponent's last move)
+                if i % 2 == 1 and move_key == key:
                     return True
-                
+
                     # # TODO: Figure out why actual repetition logic is not preventing repetitions
                     # repetitions += 1
 
@@ -240,7 +241,7 @@ class ChessBot:
         Returns the best value and move for the current player.
         """
         key: Hashable = board._transposition_key() # ? Much faster than python-chess's zobrist hashing
-        
+
         # Evaluate game-ending conditions
         best_move = next(board.generate_legal_moves(), None) # Get first move
         if not best_move: # No legal moves
@@ -256,7 +257,7 @@ class ChessBot:
 
         # Terminal node check
         if depth == 0:
-            value = np.int16(color_multiplier * score.calculate())
+            value = np.int16(color_multiplier) * score.calculate()
             return value, None # No move to return
             # return self.quiescence(board, 3, alpha, beta, score), None # No move to return
 
@@ -364,7 +365,7 @@ class ChessBot:
 
         # Terminal node check
         if depth == 0:
-            value = np.int16(color_multiplier * score.calculate())
+            value = np.int16(color_multiplier) * score.calculate()
             # self.transposition_table[key] = TTEntry(depth, value, EXACT, None) # TODO: Test
             return value, None # No move to return
             # return self.quiescence(board, 3, alpha, beta, score), None # No move to return
@@ -726,7 +727,8 @@ class ChessBot:
         #       f"{colors.BOLD}{colors.get_move_time_color(time_taken)}{time_taken:.2f}{colors.RESET} s = "
         #       f"{colors.BOLD}{colors.CYAN}{time_per_move * 1000:.4f}{colors.RESET} ms/M, "
         #       f"{colors.BOLD}{colors.CYAN}{moves_per_second:,.0f}{colors.RESET} M/s")
-        print(f"Moves checked: {colors.BOLD}{colors.get_moves_color(self.moves_checked)}{self.moves_checked:,}{colors.RESET}")
+        print(
+            f"Moves checked: {colors.BOLD}{colors.get_moves_color(self.moves_checked)}{self.moves_checked:,}{colors.RESET}")
 
         # Calculate memory usage more accurately
         tt_entry_size = getsizeof(TTEntry(np.int8(0), np.int16(0), EXACT, chess.Move.from_uci("e2e4")), 64)

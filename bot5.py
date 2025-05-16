@@ -256,7 +256,7 @@ class ChessBot:
 
         # Terminal node check
         if depth == 0:
-            value = np.int16(color_multiplier * score.calculate())
+            value = np.int16(color_multiplier) * score.calculate()
             return value, None # No move to return
             # return self.quiescence(board, 3, alpha, beta, score), None # No move to return
 
@@ -364,7 +364,7 @@ class ChessBot:
 
         # Terminal node check
         if depth == 0:
-            value = np.int16(color_multiplier * score.calculate())
+            value = np.int16(color_multiplier) * score.calculate()
             # self.transposition_table[key] = TTEntry(depth, value, EXACT, None) # TODO: Test
             return value, None # No move to return
             # return self.quiescence(board, 3, alpha, beta, score), None # No move to return
@@ -527,8 +527,8 @@ class ChessBot:
 
         first_guess, best_move = np.int16(0), None
         for depth in range(1, DEPTH + 1):
-            # first_guess, best_move = self.mtd_fix(board, first_guess)
-            first_guess, best_move = self.mtd_safe_fix(board, first_guess, np.int8(depth), color_multiplier, key)
+            first_guess, best_move = self.mtd_fix(board, first_guess, color_multiplier)
+            # first_guess, best_move = self.mtd_safe_fix(board, first_guess, np.int8(depth), color_multiplier, key)
 
         return first_guess, best_move
 
@@ -580,7 +580,6 @@ class ChessBot:
             gamma = g + 1 if g == lower_bound else g
 
             g, best_move = self.mt_negamax(board, depth, gamma, color_multiplier, self.score)
-            # g, best_move = self.negamax_alpha_beta(board, depth, gamma - 1,  gamma, int(color_multiplier), self.score)
 
             if g < gamma:
                 upper_bound = g
@@ -678,8 +677,8 @@ class ChessBot:
             color_multiplier = np.int8(1) if board.turn else np.int8(-1) # 1 for white, -1 for black
             # best_value, best_move = self.best_node_search(board, alpha, beta, board.turn)
 
-            best_value, best_move = self.negamax_alpha_beta(board, DEPTH, alpha, beta, color_multiplier, self.score)
-            # best_value, best_move = self.iterative_deepening_mtd_fix_driver(board)
+            # best_value, best_move = self.negamax_alpha_beta(board, DEPTH, alpha, beta, color_multiplier, self.score)
+            best_value, best_move = self.iterative_deepening_mtd_fix_driver(board)
 
             best_value *= color_multiplier
 

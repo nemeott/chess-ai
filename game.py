@@ -1,6 +1,6 @@
 import chess
 import chess.svg
-from bot4 import ChessBot
+from bot5 import ChessBot
 from score import Score
 from human import HumanPlayer
 import pygame
