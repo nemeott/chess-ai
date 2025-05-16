@@ -219,8 +219,7 @@ def process_epd_position(epd_data: Tuple[int, str]) -> Dict[str, Any]:
             message += " - Terminated"
 
         message += f", {board.fullmove_number}"
-        results["message"].append(f"{message} {board.fullmove_number}")
-        print(f"{colors.CYAN}{message}{colors.RESET}")
+        results["message"].append(f"{colors.CYAN}{message}{colors.RESET}")
 
     return results
 
@@ -234,6 +233,21 @@ def main():
     bot5_wins = []
     draws = []
 
+    total_tasks = len(epd_tasks)
+    completed_tasks = 0
+
+    def collect_result(result):
+        nonlocal completed_tasks
+        completed_tasks += 1
+
+        print(f"{colors.CYAN}Completed {completed_tasks}/{total_tasks} tasks.{colors.RESET}")
+
+        # Combine the results
+        messages.extend(result["message"])
+        bot4_wins.extend(result["bot4_wins"])
+        bot5_wins.extend(result["bot5_wins"])
+        draws.extend(result["draws"])
+
     # Determine optimal number of processes
     num_processes = min(len(epd_tasks), os.cpu_count() or 4)
     print("----------------------------------------------------")
@@ -244,23 +258,19 @@ def main():
     pool = multiprocessing.Pool(processes=num_processes)
 
     # Map the work to the processes
-    results = pool.map(process_epd_position, epd_tasks)
+    for task in epd_tasks: 
+        # results = pool.map_async(process_epd_position, epd_tasks, callback=collect_result)
+        pool.apply_async(process_epd_position, (task,), callback=collect_result)
 
-    # Close the pool to new tasks and wait for the worker processes to finish
+    # Close the pool to new tasks
     pool.close()
+
+    # Wait for all tasks to complete
     pool.join()
 
     print("---------------------------------------------------")
-    print("Processing EPD positions in parallel...")
-    for result in sorted(results, key=lambda x: x["index"]):
-        for message in result["message"]:
-            print(message)
-
-        # Combine the results
-        bot4_wins.extend(result["bot4_wins"])
-        bot5_wins.extend(result["bot5_wins"])
-        draws.extend(result["draws"])
-    print("---------------------------------------------------")
+    # for message in messages:
+    #     print(message)
 
     # Display the results
     print(f"Bot 4 won {len(bot4_wins)} times.")
@@ -313,7 +323,12 @@ Negamax vs Negamax No-Rep Mate Fix: 90-96-32 (Stalemate, Fivefold, Terminated)
 -----------------------------------------------------------------------------------------
 Negamax := Negamax No-Rep Mate Fix
 
-Negamax vs MTD Fix Negamax: 
+Negamax vs MTD Fix Negamax: 21-21-6 (Terminated: 5, Insufficient Material: 1)
+Negamax vs MTD Fix Safe OLD: 23-19-6 (Terminated: 5, Insufficient Material: 1)
+Negamax vs MTD Fix Safe NEW: 24-18-6 (Terminated: 5, Insufficient Material: 1)
+Negamax vs MTD Fix Safe HIGH: 24-19-5 (Terminated: 3, Insufficient Material: 2)
+
+MTD Fix Negamax vs MTD Fix Safe OLD: 
 -----------------------------------------------------------------------------------------
 Negamax vs MTD Fix NEW
 """

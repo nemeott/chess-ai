@@ -231,7 +231,7 @@ class ChessBot:
         #             if null_value >= gamma: # If null move causes beta cutoff, prune this subtree
         #                 return null_value, None
 
-    def mt_negamax(self, board: chess.Board, depth: np.int8, gamma: np.int16, color_multiplier: np.int8, score: Score, allow_null_move: bool = True) -> tuple[np.int16, Optional[chess.Move]]:
+    def mt_negamax(self, board: chess.Board, depth: np.int8, gamma: np.int16, color_multiplier: np.int16, score: Score, allow_null_move: bool = True) -> tuple[np.int16, Optional[chess.Move]]:
         """
         Memory-enhanced Test negamax search algorithm proposed by Jan-Jaap van Horssen.
         Uses a null window search to find the best move.
@@ -242,7 +242,7 @@ class ChessBot:
         key: Hashable = board._transposition_key() # ? Much faster than python-chess's zobrist hashing
         
         # Evaluate game-ending conditions
-        best_move = next(board.generate_legal_moves(), None) # Get first move
+        best_move = next(board.generate_legal_moves(), None) # ! SLOW
         if not best_move: # No legal moves
             if board.is_check(): # Checkmate
                 return np.int16(MIN_VALUE + (DEPTH - depth)), None # Subtract depth to encourage faster mate
@@ -256,7 +256,7 @@ class ChessBot:
 
         # Terminal node check
         if depth == 0:
-            value = np.int16(color_multiplier) * score.calculate()
+            value = color_multiplier * score.calculate()
             return value, None # No move to return
             # return self.quiescence(board, 3, alpha, beta, score), None # No move to return
 
@@ -301,12 +301,12 @@ class ChessBot:
         # Store position in transposition table according to Jan-Jaap van Horssen's algorithm
         # There are three viable options for the new TT move in function MT:
         # tt.store(board, g, g < gamma ? UPPER : LOWER, depth, <NEW_TT_MOVE>);
-        # --> OLD (50.1%): <NEW_TT_MOVE> := move (least moves checked)
+        #     OLD (50.1%): <NEW_TT_MOVE> := move (least moves checked)
         #     NEW (49.6%): <NEW_TT_MOVE> := g >= gamma ? move : NO_MOVE
         #     HIGH (50.2%): <NEW_TT_MOVE> := g >= gamma ? move : ttMove (2nd least moves checked)
         if best_value < gamma:
             flag = UPPERBOUND
-            # best_move = tt_move # Uncomment for HIGH
+            best_move = tt_move # Uncomment for HIGH
             # best_move = None # Uncomment for NEW (requires fix in MTD)
         else: # best_value >= gamma
             flag = LOWERBOUND
@@ -341,7 +341,7 @@ class ChessBot:
         #                 if null_value >= beta:
         #                     return null_value, None
 
-    def negamax_alpha_beta(self, board: chess.Board, depth: np.int8, alpha: np.int16, beta: np.int16, color_multiplier: np.int8, score: Score, allow_null_move: bool = True) -> tuple[np.int16, Optional[chess.Move]]:
+    def negamax_alpha_beta(self, board: chess.Board, depth: np.int8, alpha: np.int16, beta: np.int16, color_multiplier: np.int16, score: Score, allow_null_move: bool = True) -> tuple[np.int16, Optional[chess.Move]]:
         """
         Negamax search algorithm with alpha-beta pruning and transposition table.
         Scores are incrementally updated based on the move.
@@ -364,7 +364,7 @@ class ChessBot:
 
         # Terminal node check
         if depth == 0:
-            value = np.int16(color_multiplier) * score.calculate()
+            value = color_multiplier * score.calculate()
             # self.transposition_table[key] = TTEntry(depth, value, EXACT, None) # TODO: Test
             return value, None # No move to return
             # return self.quiescence(board, 3, alpha, beta, score), None # No move to return
@@ -523,16 +523,16 @@ class ChessBot:
         Iterative deepening driver for MTD(f) search.
         """
         key: Hashable = board._transposition_key() # ? Much faster than python-chess's zobrist hashing
-        color_multiplier = np.int8(1) if board.turn else np.int8(-1) # 1 for white, -1 for black
+        color_multiplier = np.int16(1) if board.turn else np.int16(-1) # 1 for white, -1 for black
 
         first_guess, best_move = np.int16(0), None
         for depth in range(1, DEPTH + 1):
-            first_guess, best_move = self.mtd_fix(board, first_guess, color_multiplier)
-            # first_guess, best_move = self.mtd_safe_fix(board, first_guess, np.int8(depth), color_multiplier, key)
+            # first_guess, best_move = self.mtd_fix(board, first_guess, color_multiplier)
+            first_guess, best_move = self.mtd_safe_fix(board, first_guess, np.int8(depth), color_multiplier, key)
 
         return first_guess, best_move
 
-    def mtd_safe_fix(self, board: chess.Board, first_guess: np.int16, depth: np.int8, color_multiplier: np.int8, key) -> tuple[np.int16, Optional[chess.Move]]:
+    def mtd_safe_fix(self, board: chess.Board, first_guess: np.int16, depth: np.int8, color_multiplier: np.int16, key) -> tuple[np.int16, Optional[chess.Move]]:
         """
         MTD(f) search algorithm enhanced with a fix proposed by Jan-Jaap van Horssen in Handling Search Inconsistencies in MTD(f)
         The algorithm uses a binary search to find the best move.
@@ -596,7 +596,7 @@ class ChessBot:
 
         return g, best_move # type: ignore
 
-    def mtd_fix(self, board: chess.Board, first_guess: np.int16, color_multiplier: np.int8) -> tuple[np.int16, Optional[chess.Move]]:
+    def mtd_fix(self, board: chess.Board, first_guess: np.int16, color_multiplier: np.int16) -> tuple[np.int16, Optional[chess.Move]]:
         """
         MTD(f) search algorithm enhanced with a fix proposed by Jan-Jaap van Horssen.
         The algorithm uses a binary search to find the best move.
@@ -627,7 +627,7 @@ class ChessBot:
 
         return guess, best_move # type: ignore
 
-    def mtd_f(self, board: chess.Board, first_guess: np.int16, color_multiplier: np.int8) -> tuple[np.int16, Optional[chess.Move]]:
+    def mtd_f(self, board: chess.Board, first_guess: np.int16, color_multiplier: np.int16) -> tuple[np.int16, Optional[chess.Move]]:
         """
         MTD(f) search algorithm.
         The algorithm uses a binary search to find the best move.
