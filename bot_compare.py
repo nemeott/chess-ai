@@ -257,15 +257,15 @@ def main():
     # Create a pool of worker processes
     pool = multiprocessing.Pool(processes=num_processes)
 
-    # Map the work to the processes
-    for task in epd_tasks: 
-        # results = pool.map_async(process_epd_position, epd_tasks, callback=collect_result)
-        pool.apply_async(process_epd_position, (task,), callback=collect_result)
+    result = pool.map_async(process_epd_position, epd_tasks, callback=collect_result)
 
     # Close the pool to new tasks
     pool.close()
 
     # Wait for all tasks to complete
+    result.wait()
+
+    # join the pool
     pool.join()
 
     print("---------------------------------------------------")
@@ -323,7 +323,7 @@ Negamax vs Negamax No-Rep Mate Fix: 90-96-32 (Stalemate, Fivefold, Terminated)
 -----------------------------------------------------------------------------------------
 Negamax := Negamax No-Rep Mate Fix
 
-Negamax vs MTD Fix Negamax: 21-21-6 (Terminated: 5, Insufficient Material: 1)
+Negamax vs MTD Fix Negamax: 23-19-6 (Terminated: 5, Insufficient Material: 1)
 Negamax vs MTD Fix Safe OLD: 23-19-6 (Terminated: 5, Insufficient Material: 1)
 Negamax vs MTD Fix Safe NEW: 24-18-6 (Terminated: 5, Insufficient Material: 1)
 Negamax vs MTD Fix Safe HIGH: 24-19-5 (Terminated: 3, Insufficient Material: 2)

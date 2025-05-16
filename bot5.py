@@ -36,7 +36,7 @@ class ChessBot:
         """
         self.score: Score = Score()
         self.moves_checked: int = 0
-        self.quiescence_moves_checked: int = 0
+        self.quiescence_moves_checked: int = 0 # TODO: Quiescence hash table?
 
         # Initialize transposition table with size in MB
         tt_entry_size = getsizeof(TTEntry(np.int8(0), np.int16(0), EXACT, chess.Move.from_uci("e2e4")), 64)
@@ -306,8 +306,8 @@ class ChessBot:
         #     HIGH (50.2%): <NEW_TT_MOVE> := g >= gamma ? move : ttMove (2nd least moves checked)
         if best_value < gamma:
             flag = UPPERBOUND
-            best_move = tt_move # Uncomment for HIGH
-            # best_move = None # Uncomment for NEW (requires fix in MTD)
+            # best_move = tt_move # Uncomment for HIGH
+            best_move = None # Uncomment for NEW (requires fix in MTD)
         else: # best_value >= gamma
             flag = LOWERBOUND
 
@@ -526,8 +526,8 @@ class ChessBot:
         color_multiplier = np.int16(1) if board.turn else np.int16(-1) # 1 for white, -1 for black
 
         first_guess, best_move = np.int16(0), None
-        for depth in range(1, DEPTH + 1):
-            # first_guess, best_move = self.mtd_fix(board, first_guess, color_multiplier)
+        for depth in range(1, DEPTH + 1): # TODO: Test 0
+            # first_guess, best_move = self.mtd_fix(board, first_guess, np.int8(depth), color_multiplier)
             first_guess, best_move = self.mtd_safe_fix(board, first_guess, np.int8(depth), color_multiplier, key)
 
         return first_guess, best_move
@@ -596,7 +596,7 @@ class ChessBot:
 
         return g, best_move # type: ignore
 
-    def mtd_fix(self, board: chess.Board, first_guess: np.int16, color_multiplier: np.int16) -> tuple[np.int16, Optional[chess.Move]]:
+    def mtd_fix(self, board: chess.Board, first_guess: np.int16, depth: np.int8, color_multiplier: np.int16) -> tuple[np.int16, Optional[chess.Move]]:
         """
         MTD(f) search algorithm enhanced with a fix proposed by Jan-Jaap van Horssen.
         The algorithm uses a binary search to find the best move.
@@ -615,7 +615,7 @@ class ChessBot:
 
             beta = np.int16(max(int(guess), int(lower_bound) + 1))
 
-            guess, best_move = self.negamax_alpha_beta(board, DEPTH, beta - 1, beta, color_multiplier, self.score)
+            guess, best_move = self.negamax_alpha_beta(board, depth, beta - 1, beta, color_multiplier, self.score)
             if guess < beta:
                 upper_bound = guess
             else:
@@ -674,7 +674,7 @@ class ChessBot:
         if not best_move: # No book move found, use alpha-beta search
             start_time: float = default_timer() # Start timer
 
-            color_multiplier = np.int8(1) if board.turn else np.int8(-1) # 1 for white, -1 for black
+            color_multiplier = np.int16(1) if board.turn else np.int16(-1) # 1 for white, -1 for black
             # best_value, best_move = self.best_node_search(board, alpha, beta, board.turn)
 
             # best_value, best_move = self.negamax_alpha_beta(board, DEPTH, alpha, beta, color_multiplier, self.score)
