@@ -78,9 +78,10 @@ class ChessBot:
             root_halfmove_clock = self.root_halfmove_clock
             repetitions = 0
             for i, move_key in enumerate(self.history):
-                if i % 2 == 1 and move_key == key: # Only check our moves (history starts at the position from opponent's last move)
+                # Only check our moves (history starts at the position from opponent's last move)
+                if i % 2 == 1 and move_key == key:
                     return True
-                
+
                     # # TODO: Figure out why actual repetition logic is not preventing repetitions
                     # repetitions += 1
 
@@ -239,7 +240,7 @@ class ChessBot:
         Returns the best value and move for the current player.
         """
         key: Hashable = board._transposition_key() # ? Much faster than python-chess's zobrist hashing
-        
+
         # Evaluate game-ending conditions
         best_move = next(board.generate_legal_moves(), None) # ! SLOW
         if not best_move: # No legal moves
@@ -307,7 +308,7 @@ class ChessBot:
         #     All start the same except for the end
         if best_value < gamma:
             flag = UPPERBOUND
-            best_move = tt_move # Uncomment for HIGH
+            # best_move = tt_move # Uncomment for HIGH
             # best_move = None # Uncomment for NEW (requires fix in MTD)
         else: # best_value >= gamma
             flag = LOWERBOUND
@@ -545,28 +546,25 @@ class ChessBot:
         """
 
         """
-        During each call to the Memory Enhanced Test
-        algorithm, establish an initial principal variation by
-        disabling null move pruning until the first leaf node
-        has been evaluated. This is shown in Figure 3.
-        2. If a node along the principal variation, fails high
-        after the first move fails low, the principal variation
-        has changed. It is possible that this new principal
-        variation contains a null move. Figure 4 shows such
-        a case.
-        3. Perform a re-search from the node where the fail
-        high has occurred. Null move pruning must be
-        disabled for the re-search. Figure 5 shows the
-        resulting search tree after a re-search has removed
-        the null move from the principal variation.
+        TODO:
+            During each call to the Memory Enhanced Test
+            algorithm, establish an initial principal variation by
+            disabling null move pruning until the first leaf node
+            has been evaluated. This is shown in Figure 3.
+            2. If a node along the principal variation, fails high
+            after the first move fails low, the principal variation
+            has changed. It is possible that this new principal
+            variation contains a null move. Figure 4 shows such
+            a case.
+            3. Perform a re-search from the node where the fail
+            high has occurred. Null move pruning must be
+            disabled for the re-search. Figure 5 shows the
+            resulting search tree after a re-search has removed
+            the null move from the principal variation.
         """
 
         """
-        OLD: MTD(f) = MTD Safe = MTD Fix = MTD Safe Fix (White blunders advantage)
-        HIGH: MTD(f) = MTD Safe = MTD Fix = MTD Safe Fix (Closer to negamax and more stable)
-        NEW: MTD(f) = MTD Safe (Worst)   !=   MTD Fix = MTD Safe Fix (Similar to HIGH but shorter and found mate faster) (Similar to OLD but longer) (Clo)
-
-        Real iterative deepening:
+        TODO: Inconsistent at start (has to warm up some?)
         """
 
         gamma = 0 # Overwritten in loop
@@ -725,7 +723,8 @@ class ChessBot:
         #       f"{colors.BOLD}{colors.get_move_time_color(time_taken)}{time_taken:.2f}{colors.RESET} s = "
         #       f"{colors.BOLD}{colors.CYAN}{time_per_move * 1000:.4f}{colors.RESET} ms/M, "
         #       f"{colors.BOLD}{colors.CYAN}{moves_per_second:,.0f}{colors.RESET} M/s")
-        print(f"Moves checked: {colors.BOLD}{colors.get_moves_color(self.moves_checked)}{self.moves_checked:,}{colors.RESET}")
+        print(
+            f"Moves checked: {colors.BOLD}{colors.get_moves_color(self.moves_checked)}{self.moves_checked:,}{colors.RESET}")
 
         # Calculate memory usage more accurately
         tt_entry_size = TTEntry(np.int8(0), np.int16(0), EXACT, chess.Move.from_uci("e2e4")).__sizeof__()

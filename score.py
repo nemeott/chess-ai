@@ -1,6 +1,7 @@
 import chess
 
 import numpy as np
+from numpy.typing import NDArray
 from numba import jit # (njit not needed since default is nopython since numba 0.59.0)
 
 from dataclasses import dataclass
@@ -203,8 +204,8 @@ class Score: # Positive values favor white, negative values favor black
 
         # Cache tables for faster lookups
         _piece_values: list[np.int16] = PIECE_VALUES_STOCKFISH
-        _mg_tables: list[Optional[np.ndarray]] = PSQT[MIDGAME]
-        _eg_tables: list[Optional[np.ndarray]] = PSQT[ENDGAME]
+        _mg_tables: list[Optional[NDArray[np.int16]]] = PSQT[MIDGAME]
+        _eg_tables: list[Optional[NDArray[np.int16]]] = PSQT[ENDGAME]
 
         # Cache constants for faster lookups
         _isolated_pawn_penalty = ISOLATED_PAWN_PENALTY
@@ -406,4 +407,4 @@ class Score: # Positive values favor white, negative values favor black
 
 # Warm up numba
 _ = Score()
-_.calculate()
+_._numba_calculate(0, 0, 0, 0, 0, 0)

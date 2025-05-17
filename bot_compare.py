@@ -313,6 +313,7 @@ W3-W4-D:
 Negamax vs Negamax: 10-10-28 (Fivefold draws)
 Negamax vs Negamax Late Terminal Check: 10-9-29 (Fivefold draws)
 Negamax vs Negamax Store Terminal: 9-10-29 (Fivefold draws)
+
 Negamax vs Negamax No-Rep: 23-14-11 (Fivefold: 5, Stalemate: 5, Insufficient Material: 1)
 Negamax No-Rep vs Negamax No-Rep: 12-12-24 (Terminated: 22, Fivefold: 2)
 -----------------------------------------------------------------------------------------
@@ -323,12 +324,10 @@ Negamax vs Negamax No-Rep Mate Fix: 90-96-32 (Stalemate, Fivefold, Terminated)
 Negamax := Negamax No-Rep Mate Fix
 
 Negamax vs MTD Fix Negamax: 23-19-6 (Terminated: 5, Insufficient Material: 1)
+
 Negamax vs MTD Fix Safe OLD: 23-19-6 (Terminated: 5, Insufficient Material: 1)
 Negamax vs MTD Fix Safe NEW: 24-18-6 (Terminated: 5, Insufficient Material: 1)
 Negamax vs MTD Fix Safe HIGH: 24-19-5 (Terminated: 3, Insufficient Material: 2)
-------------------------------------------------------------------------------------------
-Negamax vs MTD Fix Safe OLD: 23-19-6 (Terminated: 5, Insufficient Material: 1)
-Negamax vs MTD Fix Safe NEW: 
-Negamax vs MTD Fix Safe HIGH: 
+
 -----------------------------------------------------------------------------------------
 """
