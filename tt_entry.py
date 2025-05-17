@@ -25,3 +25,9 @@ class TTEntry: # TODO: Pack into an integer to save space
     value: np.int16
     flag: Flag
     best_move: Optional[chess.Move]
+
+
+if __name__ == "__main__":
+    # Print the size of the TTEntry class
+    entry = TTEntry(depth=np.int8(0), value=np.int16(0), flag=EXACT, best_move=None)
+    print(f"Size of TTEntry: {entry.__sizeof__()} bytes")

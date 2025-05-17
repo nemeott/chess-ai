@@ -2,7 +2,6 @@ import chess
 from chess import polyglot # Polyglot for opening book
 import numpy as np
 
-from sys import getsizeof # For memory usage calculations
 from lru import LRU # For transposition table
 from llist import sllist, sllistnode # For history
 
@@ -39,7 +38,7 @@ class ChessBot:
         self.quiescence_moves_checked: int = 0 # TODO: Quiescence hash table?
 
         # Initialize transposition table with size in MB
-        tt_entry_size = getsizeof(TTEntry(np.int8(0), np.int16(0), EXACT, chess.Move.from_uci("e2e4")), 64)
+        tt_entry_size = TTEntry(np.int8(0), np.int16(0), EXACT, chess.Move.from_uci("e2e4")).__sizeof__()
         self.transposition_table = LRU(int(TT_SIZE) * 1024 * 1024 // tt_entry_size) # Initialize TT with size in MB
 
         self.history: sllist = sllist() # History table for detecting repetitions
@@ -301,13 +300,15 @@ class ChessBot:
         # Store position in transposition table according to Jan-Jaap van Horssen's algorithm
         # There are three viable options for the new TT move in function MT:
         # tt.store(board, g, g < gamma ? UPPER : LOWER, depth, <NEW_TT_MOVE>);
-        #     OLD (50.1%): <NEW_TT_MOVE> := move (least moves checked)
-        #     NEW (49.6%): <NEW_TT_MOVE> := g >= gamma ? move : NO_MOVE
-        #     HIGH (50.2%): <NEW_TT_MOVE> := g >= gamma ? move : ttMove (2nd least moves checked)
+        #     Comparisons made to negamax
+        #     OLD (50.1%): <NEW_TT_MOVE> := move (inconsistent start, middle same, end different but fine) (least moves checked)
+        #     NEW (49.6%): <NEW_TT_MOVE> := g >= gamma ? move : NO_MOVE (inconsistent start, middle same, end different but fine)
+        #     HIGH (50.2%): <NEW_TT_MOVE> := g >= gamma ? move : ttMove (inconsistent start, rest same) (2nd least moves checked)
+        #     All start the same except for the end
         if best_value < gamma:
             flag = UPPERBOUND
-            # best_move = tt_move # Uncomment for HIGH
-            best_move = None # Uncomment for NEW (requires fix in MTD)
+            best_move = tt_move # Uncomment for HIGH
+            # best_move = None # Uncomment for NEW (requires fix in MTD)
         else: # best_value >= gamma
             flag = LOWERBOUND
 
@@ -727,7 +728,7 @@ class ChessBot:
         print(f"Moves checked: {colors.BOLD}{colors.get_moves_color(self.moves_checked)}{self.moves_checked:,}{colors.RESET}")
 
         # Calculate memory usage more accurately
-        tt_entry_size = getsizeof(TTEntry(np.int8(0), np.int16(0), EXACT, chess.Move.from_uci("e2e4")), 64)
+        tt_entry_size = TTEntry(np.int8(0), np.int16(0), EXACT, chess.Move.from_uci("e2e4")).__sizeof__()
         transposition_table_entries = len(self.transposition_table)
         tt_size_mb = transposition_table_entries * tt_entry_size / (1024 * 1024)
 

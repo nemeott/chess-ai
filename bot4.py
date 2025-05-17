@@ -2,7 +2,6 @@ import chess
 from chess import polyglot # Polyglot for opening book
 import numpy as np
 
-from sys import getsizeof # For memory usage calculations
 from lru import LRU # For transposition table
 from llist import sllist, sllistnode # For history
 
@@ -36,10 +35,10 @@ class ChessBot:
         """
         self.score: Score = Score()
         self.moves_checked: int = 0
-        self.quiescence_moves_checked: int = 0
+        self.quiescence_moves_checked: int = 0 # TODO: Quiescence hash table?
 
         # Initialize transposition table with size in MB
-        tt_entry_size = getsizeof(TTEntry(np.int8(0), np.int16(0), EXACT, chess.Move.from_uci("e2e4")), 64)
+        tt_entry_size = TTEntry(np.int8(0), np.int16(0), EXACT, chess.Move.from_uci("e2e4")).__sizeof__()
         self.transposition_table = LRU(int(TT_SIZE) * 1024 * 1024 // tt_entry_size) # Initialize TT with size in MB
 
         self.history: sllist = sllist() # History table for detecting repetitions
@@ -306,8 +305,8 @@ class ChessBot:
         #     HIGH (50.2%): <NEW_TT_MOVE> := g >= gamma ? move : ttMove (2nd least moves checked)
         if best_value < gamma:
             flag = UPPERBOUND
-            best_move = tt_move # Uncomment for HIGH
-            # best_move = None # Uncomment for NEW (requires fix in MTD)
+            # best_move = tt_move # Uncomment for HIGH
+            best_move = None # Uncomment for NEW (requires fix in MTD)
         else: # best_value >= gamma
             flag = LOWERBOUND
 
@@ -526,9 +525,9 @@ class ChessBot:
         color_multiplier = np.int16(1) if board.turn else np.int16(-1) # 1 for white, -1 for black
 
         first_guess, best_move = np.int16(0), None
-        for depth in range(1, DEPTH + 1):
-            first_guess, best_move = self.mtd_fix(board, first_guess, np.int8(depth), color_multiplier)
-            # first_guess, best_move = self.mtd_safe_fix(board, first_guess, np.int8(depth), color_multiplier, key)
+        for depth in range(1, DEPTH + 1): # TODO: Test 0
+            # first_guess, best_move = self.mtd_fix(board, first_guess, np.int8(depth), color_multiplier)
+            first_guess, best_move = self.mtd_safe_fix(board, first_guess, np.int8(depth), color_multiplier, key)
 
         return first_guess, best_move
 
@@ -727,7 +726,7 @@ class ChessBot:
         print(f"Moves checked: {colors.BOLD}{colors.get_moves_color(self.moves_checked)}{self.moves_checked:,}{colors.RESET}")
 
         # Calculate memory usage more accurately
-        tt_entry_size = getsizeof(TTEntry(np.int8(0), np.int16(0), EXACT, chess.Move.from_uci("e2e4")), 64)
+        tt_entry_size = TTEntry(np.int8(0), np.int16(0), EXACT, chess.Move.from_uci("e2e4")).__sizeof__()
         transposition_table_entries = len(self.transposition_table)
         tt_size_mb = transposition_table_entries * tt_entry_size / (1024 * 1024)
 

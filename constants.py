@@ -1,9 +1,9 @@
 import chess
-import numpy as np # For piece square tables
+import numpy as np
 
 from typing_extensions import TypeAlias # For GameStage
 from typing import Optional
-from numpy.typing import NDArray # Add this import at the top of the file if not already present
+from numpy.typing import NDArray
 
 # Set to None for standard starting position, or FEN string for custom starting position
 STARTING_FEN: Optional[str] = None

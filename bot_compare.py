@@ -326,8 +326,9 @@ Negamax vs MTD Fix Negamax: 23-19-6 (Terminated: 5, Insufficient Material: 1)
 Negamax vs MTD Fix Safe OLD: 23-19-6 (Terminated: 5, Insufficient Material: 1)
 Negamax vs MTD Fix Safe NEW: 24-18-6 (Terminated: 5, Insufficient Material: 1)
 Negamax vs MTD Fix Safe HIGH: 24-19-5 (Terminated: 3, Insufficient Material: 2)
-
-MTD Fix Negamax vs MTD Fix Safe OLD: 
+------------------------------------------------------------------------------------------
+Negamax vs MTD Fix Safe OLD: 23-19-6 (Terminated: 5, Insufficient Material: 1)
+Negamax vs MTD Fix Safe NEW: 
+Negamax vs MTD Fix Safe HIGH: 
 -----------------------------------------------------------------------------------------
-Negamax vs MTD Fix NEW
 """
