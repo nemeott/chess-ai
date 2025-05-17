@@ -196,24 +196,23 @@ def process_epd_position(epd_data: Tuple[int, str]) -> Dict[str, Any]:
 
         outcome: Optional[chess.Outcome] = board.outcome()
         if outcome:
-            match outcome.winner:
-                case chess.WHITE: # White wins
-                    if turn: # Bot 4 won
-                        results["bot4_wins"].append((outcome.termination, chess.WHITE, board.fullmove_number, epd))
-                        message += " - W"
-                    else: # Bot 5 won
-                        results["bot5_wins"].append((outcome.termination, chess.WHITE, board.fullmove_number, epd))
-                        message += " - L"
-                case chess.BLACK: # Black wins
-                    if turn: # Bot 5 won
-                        results["bot5_wins"].append((outcome.termination, chess.BLACK, board.fullmove_number, epd))
-                        message += " - L"
-                    else: # Bot 4 won
-                        results["bot4_wins"].append((outcome.termination, chess.BLACK, board.fullmove_number, epd))
-                        message += " - W"
-                case None:
-                    results["draws"].append((outcome.termination, board.fullmove_number, epd))
-                    message += " - D"
+            if outcome.winner == chess.WHITE:
+                if turn:  # Bot 4 won
+                    results["bot4_wins"].append((outcome.termination, chess.WHITE, board.fullmove_number, epd))
+                    message += " - W"
+                else:  # Bot 5 won
+                    results["bot5_wins"].append((outcome.termination, chess.WHITE, board.fullmove_number, epd))
+                    message += " - L"
+            elif outcome.winner == chess.BLACK:  # Black wins
+                if turn:  # Bot 5 won
+                    results["bot5_wins"].append((outcome.termination, chess.BLACK, board.fullmove_number, epd))
+                    message += " - L"
+                else:  # Bot 4 won
+                    results["bot4_wins"].append((outcome.termination, chess.BLACK, board.fullmove_number, epd))
+                    message += " - W"
+            elif outcome.winner is None:
+                results["draws"].append((outcome.termination, board.fullmove_number, epd))
+                message += " - D"
         else:
             results["draws"].append((None, board.fullmove_number, epd))
             message += " - Terminated"
@@ -257,13 +256,11 @@ def main():
     # Create a pool of worker processes
     pool = multiprocessing.Pool(processes=num_processes)
 
-    result = pool.map_async(process_epd_position, epd_tasks, callback=collect_result)
+    for task in epd_tasks:
+        pool.apply_async(process_epd_position, (task,), callback=collect_result)
 
     # Close the pool to new tasks
     pool.close()
-
-    # Wait for all tasks to complete
-    result.wait()
 
     # join the pool
     pool.join()
@@ -295,8 +292,7 @@ def main():
     for draw in draws:
         print(f"{draw}")
 
-
-if __name__ == "__main__":
+def start():
     # Time the execution of the main function
     start_time = default_timer()
 
@@ -307,6 +303,9 @@ if __name__ == "__main__":
     print("---------------------------------------------------")
     print(f"Execution time: {end_time - start_time:.2f} seconds")
     print("---------------------------------------------------")
+
+if __name__ == "__main__":
+    start()
 
 """
 W3-W4-D:

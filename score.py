@@ -402,3 +402,8 @@ class Score: # Positive values favor white, negative values favor black
             eg -= -color_multiplier * _eg_tables[captured_piece_type][to_square] # type: ignore
 
         return Score(material, mg, eg, npm, pawn_struct, king_safety) # ? Expensive
+
+
+# Warm up numba
+_ = Score()
+_.calculate()

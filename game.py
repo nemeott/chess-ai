@@ -268,7 +268,7 @@ class ChessGame:
             )
 
             # Convert SVG to Pygame surface and display
-            py_image = self.svg_to_pygame_surface(svg)
+            py_image = self.svg_to_pygame_surface(str(svg))
             self.screen.blit(py_image, (0, 0))
 
         pygame.display.flip()
@@ -280,10 +280,6 @@ class ChessGame:
 
         score = Score()
         score.initialize(self.board) # Initialize scores once and update from there
-
-        # Warm up numba calculate function (compile)
-        _ = Score()
-        _ = _.calculate()
 
         while not self.board.is_game_over():
             print(
