@@ -4,7 +4,7 @@ import numpy as np
 import random
 from timeit import default_timer as timer
 import sys
-from bot2 import Score, BISHOP_PAIR_BONUS, PIECE_VALUES_STOCKFISH
+from bot4 import Score, BISHOP_PAIR_BONUS, PIECE_VALUES_STOCKFISH
 
 # ! This test concludes that the initialize approach is faster than the update approach but this is incorrect in practice.
 

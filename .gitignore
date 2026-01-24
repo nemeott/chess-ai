@@ -6,3 +6,4 @@ __pycache__/
 profile.pyspy
 current_board.svg
 polyglot-collection/
+.direnv
