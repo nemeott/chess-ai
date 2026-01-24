@@ -1,9 +1,10 @@
+# fmt: off
+from typing import Optional
+
 import chess
 import numpy as np
-
-from typing_extensions import TypeAlias # For GameStage
-from typing import Optional
 from numpy.typing import NDArray
+from typing_extensions import TypeAlias  # For GameStage
 
 # Set to None for standard starting position, or FEN string for custom starting position
 STARTING_FEN: Optional[str] = None

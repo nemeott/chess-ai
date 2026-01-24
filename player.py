@@ -2,9 +2,9 @@ import chess
 import pygame
 
 
-class HumanPlayer: # TODO: Heavily refactor
+class Player:  # TODO: Heavily refactor
     def __init__(self, game, color: chess.Color) -> None:
-        self.game = game # Store reference to game for redrawing
+        self.game = game  # Store reference to game for redrawing
         self.color = color
         self.selected_square = None
 
@@ -30,15 +30,15 @@ class HumanPlayer: # TODO: Heavily refactor
         piece = board.piece_at(from_square)
         if piece and piece.piece_type == chess.PAWN:
             rank = chess.square_rank(to_square)
-            return (self.color == chess.WHITE and rank == 7) or \
-                   (self.color == chess.BLACK and rank == 0)
+            return (self.color == chess.WHITE and rank == 7) or (self.color == chess.BLACK and rank == 0)
         return False
 
     def get_promotion_choice(self):
         """Get the promotion piece choice from the player through clickable buttons with piece icons."""
-        import chess.svg
-        import cairosvg # type: ignore[import-untyped]
         import io
+
+        import cairosvg
+        import chess.svg
         from PIL import Image
 
         pygame.font.init()
@@ -46,19 +46,14 @@ class HumanPlayer: # TODO: Heavily refactor
         screen = pygame.display.get_surface()
 
         # Define piece options
-        pieces = [
-            (chess.QUEEN, "Queen"),
-            (chess.ROOK, "Rook"),
-            (chess.BISHOP, "Bishop"),
-            (chess.KNIGHT, "Knight")
-        ]
+        pieces = [(chess.QUEEN, "Queen"), (chess.ROOK, "Rook"), (chess.BISHOP, "Bishop"), (chess.KNIGHT, "Knight")]
 
         # Calculate button dimensions and positions
         button_width = 200
         button_height = 80
         button_margin = 10
         total_height = (button_height + button_margin) * len(pieces)
-        start_y = (600 - total_height) // 2 # Center vertically in 600x600 window
+        start_y = (600 - total_height) // 2  # Center vertically in 600x600 window
 
         # Create semi-transparent overlay
         overlay = pygame.Surface((600, 600))
@@ -68,7 +63,7 @@ class HumanPlayer: # TODO: Heavily refactor
 
         # Function to convert SVG to Pygame surface
         def svg_to_pygame_surface(svg_string, size):
-            png_data = cairosvg.svg2png(bytestring=svg_string.encode('utf-8'))
+            png_data = cairosvg.svg2png(bytestring=svg_string.encode("utf-8"))
             if png_data is None:
                 raise ValueError("Failed to convert SVG to PNG.")
             image = Image.open(io.BytesIO(png_data))
@@ -76,7 +71,7 @@ class HumanPlayer: # TODO: Heavily refactor
             mode = image.mode
             size = image.size
             data = image.tobytes()
-            return pygame.image.fromstring(data, size, mode) # type: ignore
+            return pygame.image.fromstring(data, size, mode)  # type: ignore
 
         # Draw buttons and store their rectangles
         buttons = []
@@ -85,15 +80,15 @@ class HumanPlayer: # TODO: Heavily refactor
         for piece_type, piece_name in pieces:
             # Create button rectangle
             button_rect = pygame.Rect(
-                (600 - button_width) // 2, # Center horizontally
+                (600 - button_width) // 2,  # Center horizontally
                 current_y,
                 button_width,
-                button_height
+                button_height,
             )
 
             # Draw button background
             pygame.draw.rect(screen, (240, 240, 240), button_rect)
-            pygame.draw.rect(screen, (100, 100, 100), button_rect, 2) # Border
+            pygame.draw.rect(screen, (100, 100, 100), button_rect, 2)  # Border
 
             # Generate piece SVG
             piece_svg = chess.svg.piece(chess.Piece(piece_type, self.color), size=button_height - 20)
@@ -102,7 +97,7 @@ class HumanPlayer: # TODO: Heavily refactor
             # Calculate positions for piece icon and text
             piece_x = button_rect.left + 20
             piece_y = button_rect.top + 10
-            text_x = piece_x + button_height # Position text after the piece icon
+            text_x = piece_x + button_height  # Position text after the piece icon
 
             # Draw piece icon
             screen.blit(piece_surface, (piece_x, piece_y))
@@ -148,8 +143,9 @@ class HumanPlayer: # TODO: Heavily refactor
                     if piece and piece.color == self.color:
                         self.selected_square = square
                         # Immediately redraw board with highlighted square
-                        self.game.display_board(last_move=self.game.last_move,
-                                                selected_square=self.selected_square, force_update=True)
+                        self.game.display_board(
+                            last_move=self.game.last_move, selected_square=self.selected_square, force_update=True
+                        )
                 else:
                     # Second click - try to make move
                     from_square = self.selected_square
@@ -168,15 +164,16 @@ class HumanPlayer: # TODO: Heavily refactor
                     # Check if move is legal
                     if move in board.legal_moves:
                         self.selected_square = None
-                        if board.is_castling(move): # Change castling move's to_square to the empty square, not the rook's square
+                        # Change castling move's to_square to the empty square, not the rook's square
+                        if board.is_castling(move):
                             match move.uci():
-                                case "e1h1": # White castle kingside
+                                case "e1h1":  # White castle kingside
                                     move = chess.Move(chess.E1, chess.G1)
-                                case "e1a1": # White castle queenside
+                                case "e1a1":  # White castle queenside
                                     move = chess.Move(chess.E1, chess.C1)
-                                case "e8h8": # Black castle kingside
+                                case "e8h8":  # Black castle kingside
                                     move = chess.Move(chess.E8, chess.G8)
-                                case "e8a8": # Black castle queenside
+                                case "e8a8":  # Black castle queenside
                                     move = chess.Move(chess.E8, chess.C8)
                         return move
 
