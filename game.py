@@ -1,6 +1,8 @@
+"""Chess game implementation with Pygame rendering and bots/players."""
+
 import io
 import math  # For quick render arrows
-from typing import Literal, Optional
+from typing import Literal
 
 import cairosvg
 import chess
@@ -27,30 +29,30 @@ class ChessGame:
     """Represents a chess game with Pygame rendering and player management."""
 
     __slots__ = [
-        "board",
+        "WINDOW_SIZE",
         "arrow_move",
+        "black_player",
+        "board",
+        "empty_board_surface",
+        "highlighted_square_color",
+        "last_board_state",
         "last_move",
         "last_update_time",
-        "white_player",
-        "black_player",
         "piece_images",
-        "square_colors",
-        "highlighted_square_color",
-        "WINDOW_SIZE",
         "screen",
-        "last_board_state",
-        "empty_board_surface",
+        "square_colors",
+        "white_player",
     ]
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the ChessGame with board, players, and rendering setup."""
         if STARTING_FEN:
             self.board = chess.Board(STARTING_FEN)
         else:
             self.board = chess.Board()
 
-        self.arrow_move: Optional[chess.Move] = None  # Current move to draw an arrow for
-        self.last_move: Optional[chess.Move] = None  # Last move played
+        self.arrow_move: chess.Move | None = None  # Current move to draw an arrow for
+        self.last_move: chess.Move | None = None  # Last move played
         self.last_update_time: int = pygame.time.get_ticks()
 
         # Initialize players based on IS_BOT flag
@@ -98,13 +100,14 @@ class ChessGame:
         )
         # Skip resizing step since we specified size in cairosvg
         if png_data is None:
-            raise ValueError("Failed to convert SVG to PNG.")
+            msg = "Failed to convert SVG to PNG."
+            raise ValueError(msg)
         image = Image.open(io.BytesIO(png_data))
         mode = image.mode
         size = image.size
         data = image.tobytes()
 
-        mode_literal: Literal["P", "RGB", "RGBX", "RGBA", "ARGB", "BGRA"] = mode  # type: ignore
+        mode_literal: Literal["P", "RGB", "RGBX", "RGBA", "ARGB", "BGRA"] = mode  # type: ignore[assignment]
         return pygame.image.fromstring(data, size, mode_literal)
 
     def create_empty_board(self) -> pygame.Surface:
@@ -122,7 +125,7 @@ class ChessGame:
 
         return surface
 
-    def prerender_pieces(self):
+    def prerender_pieces(self) -> None:
         """Pre-render all chess piece images at the correct size."""
         piece_symbols = ["p", "n", "b", "r", "q", "k", "P", "N", "B", "R", "Q", "K"]
         square_size = self.WINDOW_SIZE // 8
@@ -183,7 +186,9 @@ class ChessGame:
 
             return surface
 
-    def draw_arrow(self, surface, from_square, to_square, color):
+        return None
+
+    def draw_arrow(self, surface, from_square, to_square, color) -> None:
         """Draw an arrow that matches the SVG implementation."""
         square_size = self.WINDOW_SIZE // 8
 
@@ -241,13 +246,21 @@ class ChessGame:
         # Blit the arrow onto the main surface
         surface.blit(arrow_surface, (0, 0))
 
-    def display_board(self, last_move=None, selected_square=None, force_update=False):
+    def display_board(
+        self,
+        last_move: chess.Move | None = None,
+        selected_square=None,
+        force_update: bool = False,
+    ) -> None:
         """Display the current board state with dynamic rendering selection."""
         current_time = pygame.time.get_ticks()
         # Skip update if too soon (unless forced)
-        if not force_update and hasattr(self, "last_update_time"):
-            if current_time - self.last_update_time < UPDATE_DELAY_MS:
-                return
+        if (
+            not force_update
+            and hasattr(self, "last_update_time")
+            and current_time - self.last_update_time < UPDATE_DELAY_MS
+        ):
+            return
 
         if CHECKING_MOVE_ARROW and self.arrow_move:
             # Use fast direct rendering during AI analysis
@@ -255,7 +268,8 @@ class ChessGame:
             if board_surface is not None:
                 self.screen.blit(board_surface, (0, 0))
             else:
-                raise ValueError("fast_render_board returned None, cannot blit to screen.")
+                msg = "fast_render_board returned None, cannot blit to screen."
+                raise ValueError(msg)
         else:
             # Use pretty SVG rendering during normal gameplay
             # Build highlight dictionary for the selected square
@@ -270,7 +284,7 @@ class ChessGame:
                         last_move.from_square,
                         last_move.to_square,
                         color="#0000FF",  # Blue color, solid
-                    )
+                    ),
                 )
             if CHECKING_MOVE_ARROW and self.arrow_move:
                 arrows.append(
@@ -278,7 +292,7 @@ class ChessGame:
                         self.arrow_move.from_square,
                         self.arrow_move.to_square,
                         color="#FF0000",  # Red for checked move, solid
-                    )
+                    ),
                 )
 
             # Create SVG with highlighted last move and selected square
@@ -301,7 +315,7 @@ class ChessGame:
         pygame.display.flip()
         self.last_update_time = current_time
 
-    def play_game(self):
+    def play_game(self) -> None:
         """Run the main game loop."""
         print("--------------------------------------------------------------")
 

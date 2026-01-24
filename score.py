@@ -1,31 +1,44 @@
+"""Score class designed for incremental updates. Also uses numba for fast game phase interpolation calculations."""
 # TODO: Format
 
-import chess
-
-import numpy as np
-from numpy.typing import NDArray
-from numba import jit # (njit not needed since default is nopython since numba 0.59.0)
-
 from dataclasses import dataclass
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
-from constants import PIECE_VALUES_STOCKFISH, BISHOP_PAIR_BONUS, DOUBLED_PAWN_PENALTY, ISOLATED_PAWN_PENALTY, FLIP, MIDGAME, ENDGAME, PSQT, CASTLING_UPDATES, NPM_SCALAR
+import chess
+import numpy as np
+from numba import jit  # (njit not needed since default is nopython since numba 0.59.0)
 
+from constants import (
+    BISHOP_PAIR_BONUS,
+    CASTLING_UPDATES,
+    DOUBLED_PAWN_PENALTY,
+    ENDGAME,
+    FLIP,
+    ISOLATED_PAWN_PENALTY,
+    MIDGAME,
+    NPM_SCALAR,
+    PIECE_VALUES_STOCKFISH,
+    PSQT,
+)
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 np.seterr(all="raise") # Raise warnings for all numpy errors
 
 
 @dataclass
 class Score: # Positive values favor white, negative values favor black
-    """
-    Class to represent the score of a position.
+    """Class to represent the score of a position.
+
     Stores material, midgame, endgame, non-pawn material, pawn structure, and king safety scores.
     Uses Numba for fast total score calculations.
     Has initialization and incremental update methods.
     Initialization is done once for the starting position and for checking if the incremental update is correct.
     Incremental updates are done for each move since it is much more efficient than re-evaluating the entire board (would have to push/pop each move).
     """
-    __slots__ = ["material", "mg", "eg", "npm", "pawn_struct", "king_safety"] # Optimization for faster lookups
+
+    __slots__ = ["eg", "king_safety", "material", "mg", "npm", "pawn_struct"] # Optimization for faster lookups
 
     def __init__(self, material: np.int16 = np.int16(0), mg: np.int16 = np.int16(0), eg: np.int16 = np.int16(0), npm: np.uint16 = np.uint16(0), pawn_struct: np.int8 = np.int8(0), king_safety: np.int8 = np.int8(0)) -> None:
         """
