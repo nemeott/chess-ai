@@ -1,13 +1,17 @@
 # fmt: off
-from typing import Optional
+"""Constants for the chess game and bot."""
+
+from typing import (
+    Optional,
+    TypeAlias,  # For GameStage
+)
 
 import chess
 import numpy as np
 from numpy.typing import NDArray
-from typing_extensions import TypeAlias  # For GameStage
 
 # Set to None for standard starting position, or FEN string for custom starting position
-STARTING_FEN: Optional[str] = None
+STARTING_FEN: str | None = None
 # STARTING_FEN: Optional[str] = "2r1nrk1/p2q1ppp/bp1p4/n1pPp3/P1P1P3/2PBB1N1/4QPPP/R4RK1 w - - 0 1"
 # STARTING_FEN: Optional[str] = "2q1rr1k/3bbnnp/p2p1pp1/2pPp3/PpP1P1P1/1P2BNNP/2BQ1PRK/7R b - - 0 1"
 # STARTING_FEN: Optional[str] = "4Q3/5Q1Q/3Q4/8/6k1/6P1/5Q2/6K1 b - - 6 120" # Easy checkmate
@@ -30,7 +34,7 @@ DEPTH: np.int8 = np.int8(5) # Search depth for the minimax algorithm
 
 # --- Polyglot Book Settings ---
 # Book from: https://sourceforge.net/projects/codekiddy-chess/files/Books/Polyglot%20books/Update1/
-OPENING_BOOK_PATH: Optional[str] = None # (Polyglot format)
+OPENING_BOOK_PATH: str | None = None # (Polyglot format)
 # OPENING_BOOK_PATH: Optional[str] = "polyglot-collection/final-book.bin" # (Polyglot format)
 WHITE_USE_OPENING_BOOK: bool = True
 BLACK_USE_OPENING_BOOK: bool = True
@@ -40,7 +44,7 @@ CHECKING_MOVE_ARROW: bool = False # Set to True to display checking move arrow (
 UPDATE_DELAY_MS: np.int8 = np.int8(30) # Delay between visual updates in milliseconds
 RENDER_DEPTH: np.int8 = np.int8(5) # Depth to render checking moves (set to DEPTH to render root moves)
 
-BREAK_TURN: Optional[np.int8] = None # Number of turns to break after (for debugging)
+BREAK_TURN: np.int8 | None = None # Number of turns to break after (for debugging)
 # BREAK_TURN: Optional[np.int8] = np.int8(20) # Number of turns to break after (for debugging)
 
 
@@ -90,7 +94,7 @@ GameStage: TypeAlias = bool
 MIDGAME: GameStage = False
 ENDGAME: GameStage = True
 
-# TODO Auto-tune these values
+# TODO: Auto-tune these values
 # Piece square tables from Rofchade (http://www.talkchess.com/forum3/viewtopic.php?f=2&t=68311&start=19)
 mg_pawn_table = np.array([
     0, 0, 0, 0, 0, 0, 0, 0,
