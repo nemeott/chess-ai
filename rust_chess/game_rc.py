@@ -354,7 +354,7 @@ class ChessGame:
             # Make the move
             self.board.reset_move_generator()
             if move in self.board.generate_legal_moves():
-                self.board.make_move(move)
+                self.board.make_move(move, check_legality=False)
             else:
                 print(f"Illegal move attempted: {move}")
                 break

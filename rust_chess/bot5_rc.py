@@ -325,7 +325,7 @@ class ChessBot:
 
             updated_score: Score = _score_updated(board, move)
             # _push(move)
-            temp_board = board.make_move_new(move)
+            temp_board = board.make_move_new(move, check_legality=False)
             value = -_mt_negamax(temp_board, depth - 1, -gamma + 1, -color_multiplier, updated_score)[0]
             # _pop()
 
