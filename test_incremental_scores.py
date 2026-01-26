@@ -1,6 +1,6 @@
 import chess
 import sys
-from bot2 import Score
+from score import Score
 from timeit import default_timer
 
 # ANSI color codes

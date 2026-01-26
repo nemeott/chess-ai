@@ -142,6 +142,7 @@ class ChessBot:
 
         # Sort remaining moves
         ordered_moves = []
+        board.reset_move_generator()
         for move in board.generate_legal_moves():  # ! REALLY SLOW
             if not tt_move or move != tt_move:  # Skip TT move since already yielded
                 score = 0
@@ -280,13 +281,14 @@ class ChessBot:
         key = None
 
         # Evaluate game-ending conditions
+        board.reset_move_generator()
         best_move = next(board.generate_legal_moves(), None)  # ! SLOW
         if not best_move:  # No legal moves
             if board.is_check():  # Checkmate
                 return np.int16(MIN_VALUE + (DEPTH - depth)), None  # Subtract depth to encourage faster mate
             return np.int16(0), None  # Stalemate
         # Avoid insufficient material, fifty move rule, threfold repetition
-        if board.is_insufficient_material() or board.is_fifty_moves() or self.is_repetition(board, key, depth):
+        if board.is_insufficient_material() or board.is_fifty_moves(): #or self.is_repetition(board, key, depth):
             return np.int16(0), None
 
         # Terminal node check
@@ -349,7 +351,8 @@ class ChessBot:
         else:  # best_value >= gamma
             flag = LOWERBOUND
 
-        self.transposition_table[key] = TTEntry(depth, best_value, flag, best_move)
+        # FIXME: Add transposition support
+        # self.transposition_table[key] = TTEntry(depth, best_value, flag, best_move)
 
         return best_value, best_move
 

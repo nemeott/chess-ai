@@ -233,7 +233,7 @@ class Score: # Positive values favor white, negative values favor black
         castling = False
         if piece_type == rc.PAWN: # Update pawn structure if moving a pawn
             pawns_before = board.get_piece_bitboard(rc.Piece(rc.PAWN, piece_color))
-            pawns_after = pawns_before & ~(1 << from_square.to_bitboard()) # Remove moved pawn from pawns
+            pawns_after = pawns_before & ~(rc.Bitboard.from_square(from_square)) # Remove moved pawn from pawns
             if promotion_piece_type: # If we are promoting, then we need to account for the disappearance of the pawn
                 file_masks = rc.BB_FILES
                 file = from_square.get_index() & 7
@@ -258,7 +258,7 @@ class Score: # Positive values favor white, negative values favor black
                         pawn_struct -= color_multiplier * _isolated_pawn_penalty # Add penalty for isolated right file
 
             else: # Not promoting
-                pawns_after |= 1 << to_square.to_bitboard() # Add moved pawn to pawns
+                pawns_after |= rc.Bitboard.from_square(to_square) # Add moved pawn to pawns
 
                 file_masks = rc.BB_FILES
                 file = from_square.get_index() & 7
@@ -373,7 +373,7 @@ class Score: # Positive values favor white, negative values favor black
             # --- Pawn Structure ---
             if captured_piece_type == rc.PAWN: # Capturing a pawn
                 enemy_pawns_before = board.get_piece_bitboard(rc.Piece(rc.PAWN, not piece_color))
-                enemy_pawns_after = enemy_pawns_before & ~(1 << to_square.to_bitboard()) # Remove captured pawn from enemy pawns
+                enemy_pawns_after = enemy_pawns_before & ~(rc.Bitboard.from_square(to_square)) # Remove captured pawn from enemy pawns
 
                 file_masks = rc.BB_FILES
                 file = to_square.get_index() & 7 # Get the file of the captured pawn
@@ -391,7 +391,7 @@ class Score: # Positive values favor white, negative values favor black
                         pawn_struct -= -color_multiplier * _isolated_pawn_penalty # Add penalty
                     # Right adj isolated
                     if right_pawns >= 1 and ((enemy_pawns_after & file_masks[file + 2]).popcnt() if file < 6 else 0) == 0:
-                        pawn_struct -= -color_multiplier * 20 # Add penalty
+                        pawn_struct -= -color_multiplier * _isolated_pawn_penalty # Add penalty
                 elif pawns_in_file_after == 1: # 2 pawns in file before
                     pawn_struct += -color_multiplier * _doubled_pawn_penalty # Remove doubled pawn penalty
 
