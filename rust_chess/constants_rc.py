@@ -6,9 +6,10 @@ from typing import (
     TypeAlias,  # For GameStage
 )
 
-import chess
 import numpy as np
 from numpy.typing import NDArray
+
+import rust_chess as rc
 
 # Set to None for standard starting position, or FEN string for custom starting position
 STARTING_FEN: str | None = None
@@ -50,7 +51,6 @@ BREAK_TURN: np.int8 | None = None # Number of turns to break after (for debuggin
 
 # --- Piece Values and Bonuses ---
 PIECE_VALUES_STOCKFISH: list[np.int16] = [
-    np.int16(0), # Python chess starts piece indexing at 1, so we add an empty slot
     np.int16(208), # Pawn
     np.int16(781), # Knight
     np.int16(825), # Bishop
@@ -59,33 +59,28 @@ PIECE_VALUES_STOCKFISH: list[np.int16] = [
     np.int16(32_000) # King (Not max value to avoid overflow if capturing queen (MVV-LVA))
 ]
 
-BISHOP_PAIR_BONUS = np.int16(PIECE_VALUES_STOCKFISH[chess.PAWN] >> 1) # Half the value of a pawn
+BISHOP_PAIR_BONUS = np.int16(PIECE_VALUES_STOCKFISH[rc.PAWN.get_index()] >> 1) # Half the value of a pawn
 
 ISOLATED_PAWN_PENALTY = np.int8(20) # Penalty for isolated pawns
 DOUBLED_PAWN_PENALTY = np.int8(10) # Penalty for doubled pawns
 
 # Total npm at start (16604 with stockfish values)
-START_NPM = np.int16(PIECE_VALUES_STOCKFISH[chess.KNIGHT] * 4 +
-                     PIECE_VALUES_STOCKFISH[chess.BISHOP] * 4 +
-                     PIECE_VALUES_STOCKFISH[chess.ROOK] * 4 +
-                     PIECE_VALUES_STOCKFISH[chess.QUEEN] * 2)
+START_NPM = np.int16(PIECE_VALUES_STOCKFISH[rc.KNIGHT.get_index()] * 4 +
+                     PIECE_VALUES_STOCKFISH[rc.BISHOP.get_index()] * 4 +
+                     PIECE_VALUES_STOCKFISH[rc.ROOK.get_index()] * 4 +
+                     PIECE_VALUES_STOCKFISH[rc.QUEEN.get_index()] * 2)
 # NPM scalar for evaluation (65 with stockfish values)
 NPM_SCALAR = np.int8((START_NPM // 256) + 1)
 
 # --- Miscellaneous ---
 
-"""
-Flips a square (eg. A1 -> A8)
-"""
-FLIP = lambda sq: sq ^ 56
-
 # Use a dict for faster lookup of castling updates
-CASTLING_UPDATES: dict[tuple[chess.Square, chess.Square, chess.Color], tuple[chess.Square, chess.Square]] = {
+CASTLING_UPDATES: dict[tuple[rc.Square, rc.Square, rc.Color], tuple[rc.Square, rc.Square]] = {
     # (from_square, to_square, color): (rook_from, rook_to)
-    (chess.E1, chess.G1, chess.WHITE): (chess.H1, chess.F1), # White kingside
-    (chess.E1, chess.C1, chess.WHITE): (chess.A1, chess.D1), # White queenside
-    (chess.E8, chess.G8, chess.BLACK): (chess.H8, chess.F8), # Black kingside
-    (chess.E8, chess.C8, chess.BLACK): (chess.A8, chess.D8), # Black queenside
+    (rc.E1, rc.G1, rc.WHITE): (rc.H1, rc.F1), # White kingside
+    (rc.E1, rc.C1, rc.WHITE): (rc.A1, rc.D1), # White queenside
+    (rc.E8, rc.G8, rc.BLACK): (rc.H8, rc.F8), # Black kingside
+    (rc.E8, rc.C8, rc.BLACK): (rc.A8, rc.D8), # Black queenside
 }
 
 # --- Piece-Square Tables ---
@@ -95,7 +90,7 @@ MIDGAME: GameStage = False
 ENDGAME: GameStage = True
 
 # TODO: Auto-tune these values
-# Piece square tables from Rofchade (http://www.talkchess.com/forum3/viewtopic.php?f=2&t=68311&start=19)
+# Piece square tables from Rofchade (http://www.talkrc.com/forum3/viewtopic.php?f=2&t=68311&start=19)
 mg_pawn_table = np.array([
     0, 0, 0, 0, 0, 0, 0, 0,
     98, 134, 61, 95, 68, 126, 34, -11,
@@ -229,23 +224,21 @@ eg_king_table = np.array([
 ], dtype=np.int16)
 
 # List of all piece square tables
-PSQT: list[list[Optional[NDArray[np.int16]]]] = [ # Using a list instead of a dict for less overhead (PSQT[MIDGAME/ENDGAME][piece_type][square])
+PSQT: list[list[NDArray[np.int16]]] = [ # Using a list instead of a dict for less overhead (PSQT[MIDGAME/ENDGAME][piece_type][square])
     [
-        None, # Python chess starts piece indexing at 1, so we add empty slots
         mg_pawn_table,
         mg_knight_table,
         mg_bishop_table,
         mg_rook_table,
         mg_queen_table,
-        mg_king_table
+        mg_king_table,
     ],
     [
-        None,
         eg_pawn_table,
         eg_knight_table,
         eg_bishop_table,
         eg_rook_table,
         eg_queen_table,
-        eg_king_table
+        eg_king_table,
     ]
 ]

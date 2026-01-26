@@ -5,6 +5,10 @@
 pkgs.mkShell {
   packages = with pkgs; [
     python313
+    python313Packages.pip
+    uv
+    
+    gcc.cc.lib # Numpy support
     zlib
     cairo
   ];
@@ -15,6 +19,7 @@ pkgs.mkShell {
     export NIX_LD_LIBRARY_PATH=${
       with pkgs;
       lib.makeLibraryPath [
+        gcc.cc.lib
         zlib
         cairo
       ]

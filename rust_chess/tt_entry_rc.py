@@ -3,8 +3,9 @@
 from dataclasses import dataclass
 from typing import TypeAlias  # For flags
 
-import chess
 import numpy as np
+
+import rust_chess as rc
 
 # Transposition table entry flags
 Flag: TypeAlias = np.int8
@@ -25,7 +26,7 @@ class TTEntry:  # TODO: Pack into an integer to save space
     depth: np.int8
     value: np.int16
     flag: Flag
-    best_move: chess.Move | None
+    best_move: rc.Move | None
 
 
 if __name__ == "__main__":
