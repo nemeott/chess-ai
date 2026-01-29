@@ -132,7 +132,7 @@ class ChessBot:
             yield tt_move
 
         # Cache functions for faster lookups
-        # _is_capture = board.is_capture  # FIXME: Add is capture
+        _is_capture = board.is_capture
         _piece_type_at = board.get_piece_type_on
 
         # Cache table for faster lookups
@@ -147,22 +147,22 @@ class ChessBot:
             if not tt_move or move != tt_move:  # Skip TT move since already yielded
                 score = 0
 
-                # # Capturing a piece bonus (MVV/LVA - Most Valuable Victim/Least Valuable Attacker)
-                # if _is_capture(move):  # FIXME: Add is capture
-                #     victim_piece_type = _piece_type_at(move.dest)
-                #     attacker_piece_type = _piece_type_at(move.source)
+                # Capturing a piece bonus (MVV/LVA - Most Valuable Victim/Least Valuable Attacker)
+                if _is_capture(move):
+                    victim_piece_type = _piece_type_at(move.dest)
+                    attacker_piece_type = _piece_type_at(move.source)
 
-                #     # Handle en passant captures
-                #     if not victim_piece_type:  # Implied en passant capture since no piece at to_square and pawn moving
-                #         victim_piece_type = _piece_type_at(rc.Square(move.dest.get_index() - (color_multiplier * 8)))
-                #         score += 5  # Small bonus for en passant captures
+                    # Handle en passant captures
+                    if not victim_piece_type:  # Implied en passant capture since no piece at to_square and pawn moving
+                        victim_piece_type = _piece_type_at(rc.Square(move.dest.get_index() - (color_multiplier * 8)))
+                        score += 5  # Small bonus for en passant captures
 
-                #     # TODO: Sort good vs bad captures
-                #     # Prioritize capturing higher value pieces using lower value pieces
-                #     score += 10_000 + int(
-                #         _piece_values[victim_piece_type]  # ty:ignore[invalid-argument-type]
-                #         - _piece_values[attacker_piece_type]  # ty:ignore[invalid-argument-type]  # noqa: COM812
-                #     )
+                    # TODO: Sort good vs bad captures
+                    # Prioritize capturing higher value pieces using lower value pieces
+                    score += 10_000 + int(
+                        _piece_values[victim_piece_type]  # ty:ignore[invalid-argument-type]
+                        - _piece_values[attacker_piece_type]  # ty:ignore[invalid-argument-type]  # noqa: COM812
+                    )
 
                 # TODO: Killer moves
                 # if move in self.killer_moves:
@@ -776,7 +776,7 @@ class ChessBot:
         # self.history.appendleft(board._transposition_key())  # Add position to history  # noqa: SLF001
         # board.pop()
 
-        # self.print_stats(board, time_taken)
+        self.print_stats(board, time_taken)
 
         return best_move
 

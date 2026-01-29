@@ -233,7 +233,7 @@ class Score: # Positive values favor white, negative values favor black
         castling = False
         if piece_type == rc.PAWN: # Update pawn structure if moving a pawn
             pawns_before = board.get_piece_bitboard(rc.Piece(rc.PAWN, piece_color))
-            pawns_after = pawns_before & ~(rc.Bitboard.from_square(from_square)) # Remove moved pawn from pawns
+            pawns_after = pawns_before & ~(from_square.to_bitboard()) # Remove moved pawn from pawns
             if promotion_piece_type: # If we are promoting, then we need to account for the disappearance of the pawn
                 file_masks = rc.BB_FILES
                 file = from_square.get_index() & 7
@@ -352,7 +352,6 @@ class Score: # Positive values favor white, negative values favor black
             eg += color_multiplier * (_eg_tables[promotion_piece_type][new_to_square] - # type: ignore
                                       _eg_tables[rc.PAWN][new_from_square]) # type: ignore
         else: # Normal move
-            assert piece_type is not None, f"{piece_type}"  # FIXME: Broken because of no transposition table?
             mg_table = _mg_tables[piece_type] # type: ignore
             eg_table = _eg_tables[piece_type] # type: ignore
             mg += color_multiplier * (mg_table[new_to_square] - mg_table[new_from_square]) # ? Expensive  # ty:ignore[not-subscriptable]

@@ -273,7 +273,8 @@ class ChessBot:
         Scores are incrementally updated based on the move.
         Returns the best value and move for the current player.
         """
-        key: Hashable = board._transposition_key()  # ? Much faster than python-chess's zobrist hashing  # noqa: SLF001
+        # key: Hashable = board._transposition_key()  # ? Much faster than python-chess's zobrist hashing  # noqa: SLF001
+        key = None
 
         # Evaluate game-ending conditions
         best_move = next(board.generate_legal_moves(), None)  # ! SLOW
@@ -282,7 +283,7 @@ class ChessBot:
                 return np.int16(MIN_VALUE + (DEPTH - depth)), None  # Subtract depth to encourage faster mate
             return np.int16(0), None  # Stalemate
         # Avoid insufficient material, fifty move rule, threfold repetition
-        if board.is_insufficient_material() or board.can_claim_fifty_moves() or self.is_repetition(board, key, depth):
+        if board.is_insufficient_material() or board.can_claim_fifty_moves(): #or self.is_repetition(board, key, depth):
             return np.int16(0), None
 
         # Terminal node check
@@ -344,7 +345,7 @@ class ChessBot:
         else:  # best_value >= gamma
             flag = LOWERBOUND
 
-        self.transposition_table[key] = TTEntry(depth, best_value, flag, best_move)
+        # self.transposition_table[key] = TTEntry(depth, best_value, flag, best_move)
 
         return best_value, best_move
 
@@ -566,7 +567,8 @@ class ChessBot:
 
     def iterative_deepening_mtd_fix_driver(self, board: chess.Board) -> tuple[np.int16, chess.Move | None]:
         """Iterative deepening driver for MTD(f) search."""  # noqa: D401
-        key: Hashable = board._transposition_key()  # ? Much faster than python-chess's zobrist hashing  # noqa: SLF001
+        # key: Hashable = board._transposition_key()  # ? Much faster than python-chess's zobrist hashing  # noqa: SLF001
+        key = None
         color_multiplier = np.int16(1) if board.turn else np.int16(-1)  # 1 for white, -1 for black
 
         first_guess, best_move = np.int16(0), None
@@ -763,7 +765,7 @@ class ChessBot:
         self.history.appendleft(board._transposition_key())  # Add position to history  # noqa: SLF001
         board.pop()
 
-        # self.print_stats(board, time_taken)
+        self.print_stats(board, time_taken)
 
         return best_move
 

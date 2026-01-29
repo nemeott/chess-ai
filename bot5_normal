@@ -1,0 +1,281 @@
+--------------------------------------------------------------
+Player: White - 1
+Moves checked: 2,186
+Transposition table: 0 entries, 0.0000 MB
+FEN: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+Eval: 33, 33
+Move played: b1c3
+--------------------------------------------------------------
+Player: Black - 1
+Moves checked: 1,718
+Transposition table: 0 entries, 0.0000 MB
+FEN: rnbqkbnr/pppppppp/8/8/8/2N5/PPPPPPPP/R1BQKBNR b KQkq - 1 1
+Eval: -3, -3
+Move played: g8f6
+--------------------------------------------------------------
+Player: White - 2
+Moves checked: 1,416
+Transposition table: 0 entries, 0.0000 MB
+FEN: rnbqkb1r/pppppppp/5n2/8/8/2N5/PPPPPPPP/R1BQKBNR w KQkq - 2 2
+Eval: 2, 2
+Move played: c3b5
+--------------------------------------------------------------
+Player: Black - 2
+Moves checked: 8,145
+Transposition table: 0 entries, 0.0000 MB
+FEN: rnbqkb1r/pppppppp/5n2/1N6/8/8/PPPPPPPP/R1BQKBNR b KQkq - 3 2
+Eval: -18, -18
+Move played: f6e4
+--------------------------------------------------------------
+Player: White - 3
+Moves checked: 4,289
+Transposition table: 0 entries, 0.0000 MB
+FEN: rnbqkb1r/pppppppp/8/1N6/4n3/8/PPPPPPPP/R1BQKBNR w KQkq - 4 3
+Eval: -6, -6
+Move played: d2d3
+--------------------------------------------------------------
+Player: Black - 3
+Moves checked: 5,929
+Transposition table: 0 entries, 0.0000 MB
+FEN: rnbqkb1r/pppppppp/8/1N6/4n3/3P4/PPP1PPPP/R1BQKBNR b KQkq - 0 3
+Eval: 15, 15
+Move played: e4c5
+--------------------------------------------------------------
+Player: White - 4
+Moves checked: 3,628
+Transposition table: 0 entries, 0.0000 MB
+FEN: rnbqkb1r/pppppppp/8/1Nn5/8/3P4/PPP1PPPP/R1BQKBNR w KQkq - 1 4
+Eval: 43, 43
+Move played: c1e3
+--------------------------------------------------------------
+Player: Black - 4
+Moves checked: 3,491
+Transposition table: 0 entries, 0.0000 MB
+FEN: rnbqkb1r/pppppppp/8/1Nn5/8/3PB3/PPP1PPPP/R2QKBNR b KQkq - 2 4
+Eval: 12, 12
+Move played: e7e5
+--------------------------------------------------------------
+Player: White - 5
+Moves checked: 3,717
+Transposition table: 0 entries, 0.0000 MB
+FEN: rnbqkb1r/pppp1ppp/8/1Nn1p3/8/3PB3/PPP1PPPP/R2QKBNR w KQkq - 0 5
+Eval: 48, 48
+Move played: g1f3
+--------------------------------------------------------------
+Player: Black - 5
+Moves checked: 1,759
+Transposition table: 0 entries, 0.0000 MB
+FEN: rnbqkb1r/pppp1ppp/8/1Nn1p3/8/3PBN2/PPP1PPPP/R2QKB1R b KQkq - 1 5
+Eval: 15, 15
+Move played: b8c6
+--------------------------------------------------------------
+Player: White - 6
+Moves checked: 3,841
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1bqkb1r/pppp1ppp/2n5/1Nn1p3/8/3PBN2/PPP1PPPP/R2QKB1R w KQkq - 2 6
+Eval: 16, 16
+Move played: f3g5
+--------------------------------------------------------------
+Player: Black - 6
+Moves checked: 2,178
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1bqkb1r/pppp1ppp/2n5/1Nn1p1N1/8/3PB3/PPP1PPPP/R2QKB1R b KQkq - 3 6
+Eval: -19, -19
+Move played: d7d5
+--------------------------------------------------------------
+Player: White - 7
+Moves checked: 9,586
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1bqkb1r/ppp2ppp/2n5/1Nnpp1N1/8/3PB3/PPP1PPPP/R2QKB1R w KQkq - 0 7
+Eval: -20, -20
+Move played: b2b4
+--------------------------------------------------------------
+Player: Black - 7
+Moves checked: 2,160
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1bqkb1r/ppp2ppp/2n5/1Nnpp1N1/1P6/3PB3/P1P1PPPP/R2QKB1R b KQkq - 0 7
+Eval: -232, -232
+Move played: c6b4
+--------------------------------------------------------------
+Player: White - 8
+Moves checked: 11,502
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1bqkb1r/ppp2ppp/8/1Nnpp1N1/1n6/3PB3/P1P1PPPP/R2QKB1R w KQkq - 0 8
+Eval: -216, -216
+Move played: c2c3
+--------------------------------------------------------------
+Player: Black - 8
+Moves checked: 1,697
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1bqkb1r/ppp2ppp/8/1Nnpp1N1/1n6/2PPB3/P3PPPP/R2QKB1R b KQkq - 0 8
+Eval: -299, -299
+Move played: b4a2
+--------------------------------------------------------------
+Player: White - 9
+Moves checked: 1,972
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1bqkb1r/ppp2ppp/8/1Nnpp1N1/8/2PPB3/n3PPPP/R2QKB1R w KQkq - 0 9
+Eval: 385, 385
+Move played: a1a2
+--------------------------------------------------------------
+Player: Black - 9
+Moves checked: 7,148
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1bqkb1r/ppp2ppp/8/1Nnpp1N1/8/2PPB3/R3PPPP/3QKB1R b Kkq - 0 9
+Eval: 376, 376
+Move played: d5d4
+--------------------------------------------------------------
+Player: White - 10
+Moves checked: 2,410
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1bqkb1r/ppp2ppp/8/1Nn1p1N1/3p4/2PPB3/R3PPPP/3QKB1R w Kkq - 0 10
+Eval: 618, 618
+Move played: c3d4
+--------------------------------------------------------------
+Player: Black - 10
+Moves checked: 1,906
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1bqkb1r/ppp2ppp/8/1Nn1p1N1/3P4/3PB3/R3PPPP/3QKB1R b Kkq - 0 10
+Eval: 396, 396
+Move played: e5d4
+--------------------------------------------------------------
+Player: White - 11
+Moves checked: 8,407
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1bqkb1r/ppp2ppp/8/1Nn3N1/3p4/3PB3/R3PPPP/3QKB1R w Kkq - 0 11
+Eval: 621, 621
+Move played: b5d4
+--------------------------------------------------------------
+Player: Black - 11
+Moves checked: 9,527
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1bqkb1r/ppp2ppp/8/2n3N1/3N4/3PB3/R3PPPP/3QKB1R b Kkq - 0 11
+Eval: 636, 636
+Move played: d8d5
+--------------------------------------------------------------
+Player: White - 12
+Moves checked: 7,480
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1b1kb1r/ppp2ppp/8/2nq2N1/3N4/3PB3/R3PPPP/3QKB1R w Kkq - 1 12
+Eval: 659, 659
+Move played: a2c2
+--------------------------------------------------------------
+Player: Black - 12
+Moves checked: 11,503
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1b1kb1r/ppp2ppp/8/2nq2N1/3N4/3PB3/2R1PPPP/3QKB1R b Kkq - 2 12
+Eval: 698, 698
+Move played: c5a6
+--------------------------------------------------------------
+Player: White - 13
+Moves checked: 22,867
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1b1kb1r/ppp2ppp/n7/3q2N1/3N4/3PB3/2R1PPPP/3QKB1R w Kkq - 3 13
+Eval: 691, 691
+Move played: d1d2
+--------------------------------------------------------------
+Player: Black - 13
+Moves checked: 5,736
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1b1kb1r/ppp2ppp/n7/3q2N1/3N4/3PB3/2RQPPPP/4KB1R b Kkq - 4 13
+Eval: 674, 674
+Move played: f8b4
+--------------------------------------------------------------
+Player: White - 14
+Moves checked: 1,179
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1b1k2r/ppp2ppp/n7/3q2N1/1b1N4/3PB3/2RQPPPP/4KB1R w Kkq - 5 14
+Eval: 678, 678
+Move played: c2c3
+--------------------------------------------------------------
+Player: Black - 14
+Moves checked: 2,554
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1b1k2r/ppp2ppp/n7/3q2N1/1b1N4/2RPB3/3QPPPP/4KB1R b Kkq - 6 14
+Eval: -625, -625
+Move played: b4c3
+--------------------------------------------------------------
+Player: White - 15
+Moves checked: 2,900
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1b1k2r/ppp2ppp/n7/3q2N1/3N4/2bPB3/3QPPPP/4KB1R w Kkq - 0 15
+Eval: 330, 330
+Move played: d2c3
+--------------------------------------------------------------
+Player: Black - 15
+Moves checked: 6,456
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1b1k2r/ppp2ppp/n7/3q2N1/3N4/2QPB3/4PPPP/4KB1R b Kkq - 0 15
+Eval: 326, 326
+Move played: d5e5
+--------------------------------------------------------------
+Player: White - 16
+Moves checked: 15,288
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1b1k2r/ppp2ppp/n7/4q1N1/3N4/2QPB3/4PPPP/4KB1R w Kkq - 1 16
+Eval: 319, 319
+Move played: c3a3
+--------------------------------------------------------------
+Player: Black - 16
+Moves checked: 6,833
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1b1k2r/ppp2ppp/n7/4q1N1/3N4/Q2PB3/4PPPP/4KB1R b Kkq - 2 16
+Eval: 280, 280
+Move played: a6c5
+--------------------------------------------------------------
+Player: White - 17
+Moves checked: 4,013
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1b1k2r/ppp2ppp/8/2n1q1N1/3N4/Q2PB3/4PPPP/4KB1R w Kkq - 3 17
+Eval: 277, 277
+Move played: g5f3
+--------------------------------------------------------------
+Player: Black - 17
+Moves checked: 13,219
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1b1k2r/ppp2ppp/8/2n1q3/3N4/Q2PBN2/4PPPP/4KB1R b Kkq - 4 17
+Eval: 281, 281
+Move played: e5d5
+--------------------------------------------------------------
+Player: White - 18
+Moves checked: 15,083
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1b1k2r/ppp2ppp/8/2nq4/3N4/Q2PBN2/4PPPP/4KB1R w Kkq - 5 18
+Eval: 273, 273
+Move played: e3g5
+--------------------------------------------------------------
+Player: Black - 18
+Moves checked: 11,147
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1b1k2r/ppp2ppp/8/2nq2B1/3N4/Q2P1N2/4PPPP/4KB1R b Kkq - 6 18
+Eval: 231, 231
+Move played: e8g8
+--------------------------------------------------------------
+Player: White - 19
+Moves checked: 6,656
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1b2rk1/ppp2ppp/8/2nq2B1/3N4/Q2P1N2/4PPPP/4KB1R w K - 7 19
+Eval: 183, 183
+Move played: e1d1
+--------------------------------------------------------------
+Player: Black - 19
+Moves checked: 7,256
+Transposition table: 0 entries, 0.0000 MB
+FEN: r1b2rk1/ppp2ppp/8/2nq2B1/3N4/Q2P1N2/4PPPP/3K1B1R b - - 8 19
+Eval: 161, 161
+Move played: c8g4
+--------------------------------------------------------------
+Player: White - 20
+Moves checked: 3,459
+Transposition table: 0 entries, 0.0000 MB
+FEN: r4rk1/ppp2ppp/8/2nq2B1/3N2b1/Q2P1N2/4PPPP/3K1B1R w - - 9 20
+Eval: 179, 179
+Move played: g5e7
+--------------------------------------------------------------
+Player: Black - 20
+Moves checked: 2,932
+Transposition table: 0 entries, 0.0000 MB
+FEN: r4rk1/ppp1Bppp/8/2nq4/3N2b1/Q2P1N2/4PPPP/3K1B1R b - - 10 20
+Eval: -651, -651
+Move played: g4f3
+--------------------------------------------------------------
