@@ -30,7 +30,7 @@ LAST_MOVE_ARROW: bool = True # Set to True to display last move arrow
 TT_SIZE: np.int8 = np.int8(32) # Size of the transposition table (in MB)
 
 # --- Search Settings ---
-DEPTH: np.int8 = np.int8(3) # Search depth for the minimax algorithm
+DEPTH: np.int8 = np.int8(5) # Search depth for the minimax algorithm
 
 # --- Polyglot Book Settings ---
 # Book from: https://sourceforge.net/projects/codekiddy-chess/files/Books/Polyglot%20books/Update1/

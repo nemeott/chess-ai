@@ -89,7 +89,7 @@ class ChessBot:
         #     self.game.arrow_move = move
         #     self.game.display_board(self.game.last_move) # Update display
 
-    def is_repetition(self, board: rc.Board, key: Hashable, depth: np.int8) -> bool:
+    def is_repetition(self, board: rc.Board, key: int, depth: np.int8) -> bool:
         """Check if the current position is a repetition.
 
         The first move in history at this point is the position from the opponent's last move.
@@ -138,7 +138,7 @@ class ChessBot:
         # Cache table for faster lookups
         _piece_values = PIECE_VALUES_STOCKFISH
 
-        color_multiplier = 1 if board.turn else -1  # 1 for white, -1 for black
+        _turn = board.turn
 
         # Sort remaining moves
         ordered_moves = []
@@ -154,7 +154,7 @@ class ChessBot:
 
                     # Handle en passant captures
                     if not victim_piece_type:  # Implied en passant capture since no piece at to_square and pawn moving
-                        victim_piece_type = _piece_type_at(rc.Square(move.dest.get_index() - (color_multiplier * 8)))
+                        victim_piece_type = _piece_type_at(move.dest.backward(_turn))  # ty:ignore[invalid-argument-type]
                         score += 5  # Small bonus for en passant captures
 
                     # TODO: Sort good vs bad captures
@@ -276,9 +276,7 @@ class ChessBot:
         Scores are incrementally updated based on the move.
         Returns the best value and move for the current player.
         """
-        # FIXME: Transposition key or zobrist
-        # key: Hashable = board._transposition_key()  # ? Much faster than python-chess's zobrist hashing  # noqa: SLF001
-        key = None
+        key: int = board.zobrist_hash
 
         # Evaluate game-ending conditions
         board.reset_move_generator()
@@ -288,7 +286,7 @@ class ChessBot:
                 return np.int16(MIN_VALUE + (DEPTH - depth)), None  # Subtract depth to encourage faster mate
             return np.int16(0), None  # Stalemate
         # Avoid insufficient material, fifty move rule, threfold repetition
-        if board.is_insufficient_material() or board.is_fifty_moves(): #or self.is_repetition(board, key, depth):
+        if board.is_insufficient_material() or board.is_fifty_moves() or self.is_repetition(board, key, depth):
             return np.int16(0), None
 
         # Terminal node check
@@ -351,8 +349,7 @@ class ChessBot:
         else:  # best_value >= gamma
             flag = LOWERBOUND
 
-        # FIXME: Add transposition support
-        # self.transposition_table[key] = TTEntry(depth, best_value, flag, best_move)
+        self.transposition_table[key] = TTEntry(depth, best_value, flag, best_move)
 
         return best_value, best_move
 
@@ -574,9 +571,7 @@ class ChessBot:
 
     def iterative_deepening_mtd_fix_driver(self, board: rc.Board) -> tuple[np.int16, rc.Move | None]:
         """Iterative deepening driver for MTD(f) search."""  # noqa: D401
-        # FIXME: Transposition key
-        # key: Hashable = board._transposition_key()  # ? Much faster than python-chess's zobrist hashing  # noqa: SLF001
-        key = None
+        key = board.zobrist_hash
         color_multiplier = np.int16(1) if board.turn else np.int16(-1)  # 1 for white, -1 for black
 
         first_guess, best_move = np.int16(0), None
@@ -592,7 +587,7 @@ class ChessBot:
         first_guess: np.int16,
         depth: np.int8,
         color_multiplier: np.int16,
-        key: Hashable,
+        key: int,
     ) -> tuple[np.int16, rc.Move | None]:
         """MTD(f) search algorithm enhanced with a fix proposed by Jan-Jaap van Horssen in Handling Search Inconsistencies in MTD(f).
 
@@ -720,9 +715,7 @@ class ChessBot:
 
     def get_move(self, board: rc.Board) -> rc.Move | None:
         """Return the best move for the current player."""
-        # FIXME: Transposition
-        # key = board._transposition_key()  # noqa: SLF001
-        key = None
+        key = board.zobrist_hash
 
         # Set the root halfmove clock
         self.root_halfmove_clock = board.halfmove_clock
