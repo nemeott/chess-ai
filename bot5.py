@@ -140,12 +140,12 @@ class ChessBot:
 
         # Sort remaining moves
         ordered_moves = []
-        for move in board.generate_legal_moves():  # ! REALLY SLOW
+        for move in board.generate_legal_moves():  # ! REALLY SLOW # 26.9s
             if not tt_move or move != tt_move:  # Skip TT move since already yielded
                 score = 0
 
                 # Capturing a piece bonus (MVV/LVA - Most Valuable Victim/Least Valuable Attacker)
-                if _is_capture(move):
+                if _is_capture(move): # 5.48s
                     victim_piece_type = _piece_type_at(move.to_square)
                     attacker_piece_type = _piece_type_at(move.from_square)
 
@@ -276,18 +276,18 @@ class ChessBot:
         key: Hashable = board._transposition_key()  # ? Much faster than python-chess's zobrist hashing  # noqa: SLF001
 
         # Evaluate game-ending conditions
-        best_move = next(board.generate_legal_moves(), None)  # ! SLOW
+        best_move = next(board.generate_legal_moves(), None)  # ! SLOW # 27.83s
         if not best_move:  # No legal moves
             if board.is_check():  # Checkmate
                 return np.int16(MIN_VALUE + (DEPTH - depth)), None  # Subtract depth to encourage faster mate
             return np.int16(0), None  # Stalemate
         # Avoid insufficient material, fifty move rule, threfold repetition
-        if board.is_insufficient_material() or board.can_claim_fifty_moves() or self.is_repetition(board, key, depth):
+        if board.is_insufficient_material() or board.can_claim_fifty_moves() or self.is_repetition(board, key, depth): # 6.88s
             return np.int16(0), None
 
         # Terminal node check
         if depth == 0:
-            value = color_multiplier * score.calculate()
+            value = color_multiplier * score.calculate() # 3.39s
             return value, None  # No move to return
             # return self.quiescence(board, 3, alpha, beta, score), None # No move to return
 
@@ -314,11 +314,11 @@ class ChessBot:
         self.history.appendleft(key)  # Add position to history
 
         best_value: np.int16 = MIN_VALUE
-        for move in self.ordered_moves_generator(board, tt_move):
+        for move in self.ordered_moves_generator(board, tt_move): # 37.86s
             _increment_moves_and_render_arrow(depth, move)  # TODO: Move increment outside to start of alpha-beta
 
-            updated_score: Score = _score_updated(board, move)
-            _push(move)
+            updated_score: Score = _score_updated(board, move) # 16.89s
+            _push(move) # 24.13s
             value = -_mt_negamax(board, depth - 1, -gamma + 1, -color_multiplier, updated_score)[0]
             _pop()
 

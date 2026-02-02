@@ -142,13 +142,13 @@ class ChessBot:
 
         # Sort remaining moves
         ordered_moves = []
-        board.reset_move_generator()
-        for move in board.generate_legal_moves():  # ! REALLY SLOW
+        board.reset_move_generator() # 0.09s
+        for move in board.generate_legal_moves():  # 0.98s
             if not tt_move or move != tt_move:  # Skip TT move since already yielded
                 score = 0
 
                 # Capturing a piece bonus (MVV/LVA - Most Valuable Victim/Least Valuable Attacker)
-                if _is_capture(move):
+                if _is_capture(move): # 0.87s
                     victim_piece_type = _piece_type_at(move.dest)
                     attacker_piece_type = _piece_type_at(move.source)
 
@@ -279,19 +279,19 @@ class ChessBot:
         key: int = board.zobrist_hash
 
         # Evaluate game-ending conditions
-        board.reset_move_generator()
-        best_move = next(board.generate_legal_moves(), None)  # ! SLOW
+        board.reset_move_generator()  # 1.00s
+        best_move = next(board.generate_legal_moves(), None)  # 0.52s
         if not best_move:  # No legal moves
             if board.is_check():  # Checkmate
                 return np.int16(MIN_VALUE + (DEPTH - depth)), None  # Subtract depth to encourage faster mate
             return np.int16(0), None  # Stalemate
         # Avoid insufficient material, fifty move rule, threfold repetition
-        if board.is_insufficient_material() or board.is_fifty_moves() or self.is_repetition(board, key, depth):
+        if board.is_insufficient_material() or board.is_fifty_moves() or self.is_repetition(board, key, depth): # 0.96s
             return np.int16(0), None
 
         # Terminal node check
         if depth == 0:
-            value = color_multiplier * score.calculate()
+            value = color_multiplier * score.calculate() # 3.17s
             return value, None  # No move to return
             # return self.quiescence(board, 3, alpha, beta, score), None # No move to return
 
@@ -318,12 +318,12 @@ class ChessBot:
         self.history.appendleft(key)  # Add position to history
 
         best_value: np.int16 = MIN_VALUE
-        for move in self.ordered_moves_generator(board, tt_move):
+        for move in self.ordered_moves_generator(board, tt_move): # 7.49s
             _increment_moves_and_render_arrow(depth, move)  # TODO: Move increment outside to start of alpha-beta
 
-            updated_score: Score = _score_updated(board, move)
+            updated_score: Score = _score_updated(board, move) # 16.48s
             # _push(move)
-            temp_board = board.make_move_new(move, check_legality=False)
+            temp_board = board.make_move_new(move, check_legality=False) # 2.2s
             value = -_mt_negamax(temp_board, depth - 1, -gamma + 1, -color_multiplier, updated_score)[0]
             # _pop()
 
