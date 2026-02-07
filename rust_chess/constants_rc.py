@@ -46,7 +46,7 @@ UPDATE_DELAY_MS: np.int8 = np.int8(30) # Delay between visual updates in millise
 RENDER_DEPTH: np.int8 = np.int8(5) # Depth to render checking moves (set to DEPTH to render root moves)
 
 BREAK_TURN: np.int8 | None = None # Number of turns to break after (for debugging)
-BREAK_TURN: np.int8 | None = np.int8(20) # Number of turns to break after (for debugging)
+# BREAK_TURN: np.int8 | None = np.int8(20) # Number of turns to break after (for debugging)
 
 
 # --- Piece Values and Bonuses ---

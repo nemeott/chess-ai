@@ -89,39 +89,11 @@ class ChessBot:
         #     self.game.arrow_move = move
         #     self.game.display_board(self.game.last_move) # Update display
 
-    def is_repetition(self, board: rc.Board, key: int, depth: np.int8) -> bool:
-        """Check if the current position is a repetition.
-
-        The first move in history at this point is the position from the opponent's last move.
-        """
-        # Check for repetitions
-        halfmove_clock = board.halfmove_clock
-        if halfmove_clock >= 4:  # Three-fold repetition possible, need to check
-            root_halfmove_clock = self.root_halfmove_clock
-            repetitions = 0
-            for i, move_key in enumerate(self.history):
-                # Only check our moves (history starts at the position from opponent's last move)
-                if i % 2 == 1 and move_key == key:
-                    return True
-
-                    # # TODO: Figure out why actual repetition logic is not preventing repetitions
-                    # repetitions += 1
-
-                    # if repetitions == 2: # This is the 3rd repetition
-                    #     return True
-                    # # ply > root_ply + 2
-                    # elif repetitions == 1 and DEPTH - depth > 2: # Prevent treating moves close to root as draws
-                    #     return True
-
-                if i >= halfmove_clock:  # Reached the last irreversible move
-                    break
-
-        return False
-
     def ordered_moves_generator(
         self,
         board: rc.Board,
         tt_move: rc.Move | None,
+        extra_move: rc.Move | None,
     ) -> Generator[rc.Move, None, None]:
         """Generate ordered moves for the current position.
 
@@ -134,52 +106,58 @@ class ChessBot:
         # Cache functions for faster lookups
         _is_capture = board.is_capture
         _piece_type_at = board.get_piece_type_on
+        _turn = board.turn
 
         # Cache table for faster lookups
         _piece_values = PIECE_VALUES_STOCKFISH
 
-        _turn = board.turn
-
-        # Sort remaining moves
+        # Sort capture moves
         ordered_moves = []
-        board.reset_move_generator() # 0.09s
-        for move in board.generate_legal_moves():  # 0.98s
-            if not tt_move or move != tt_move:  # Skip TT move since already yielded
-                score = 0
 
-                # Capturing a piece bonus (MVV/LVA - Most Valuable Victim/Least Valuable Attacker)
-                if _is_capture(move): # 0.87s
-                    victim_piece_type = _piece_type_at(move.dest)
-                    attacker_piece_type = _piece_type_at(move.source)
+        # Capturing a piece bonus (MVV/LVA - Most Valuable Victim/Least Valuable Attacker)
+        for move in board.generate_legal_captures():  # 0.98s
+            score = 0
 
-                    # Handle en passant captures
-                    if not victim_piece_type:  # Implied en passant capture since no piece at to_square and pawn moving
-                        victim_piece_type = _piece_type_at(move.dest.backward(_turn))  # ty:ignore[invalid-argument-type]
-                        score += 5  # Small bonus for en passant captures
+            victim_piece_type = _piece_type_at(move.dest)  # ty:ignore[possibly-missing-attribute]
+            attacker_piece_type = _piece_type_at(move.source)  # ty:ignore[possibly-missing-attribute]
 
-                    # TODO: Sort good vs bad captures
-                    # Prioritize capturing higher value pieces using lower value pieces
-                    score += 10_000 + int(
-                        _piece_values[victim_piece_type]  # ty:ignore[invalid-argument-type]
-                        - _piece_values[attacker_piece_type]  # ty:ignore[invalid-argument-type]  # noqa: COM812
-                    )
+            # Handle en passant captures
+            if not victim_piece_type:  # Implied en passant capture since no piece at to_square and pawn moving
+                victim_piece_type = _piece_type_at(move.dest.backward(_turn))  # ty:ignore[invalid-argument-type, possibly-missing-attribute]
+                score += 5  # Small bonus for en passant captures
 
-                # TODO: Killer moves
-                # if move in self.killer_moves:
-                #     score += 1_000
+            # TODO: Sort good vs bad captures
+            # Prioritize capturing higher value pieces using lower value pieces
+            score += 10_000 + int(
+                _piece_values[victim_piece_type]  # ty:ignore[invalid-argument-type]
+                - _piece_values[attacker_piece_type]  # ty:ignore[invalid-argument-type]  # noqa: COM812
+            )
 
-                if move.promotion:  # Promotion bonus
-                    score += 100 + _piece_values[move.promotion] - _piece_values[rc.PAWN]
-
-                # if score == 0 and board.gives_check(move): # ! SLOW
-                #     score += 100
-
-                ordered_moves.append((move, score))
+            ordered_moves.append((move, score))
 
         ordered_moves.sort(key=lambda x: x[1], reverse=True)
-
         for move_and_score in ordered_moves:
             yield move_and_score[0]
+
+        ordered_moves.clear()
+
+        if extra_move:
+            yield extra_move
+
+        for move in board.generate_legal_moves():  # 0.98s
+            # TODO: Killer moves
+            # if move in self.killer_moves:
+            #     score += 1_000
+
+            if move.promotion:  # Promotion bonus
+                yield move
+
+            # if score == 0 and board.gives_check(move): # ! SLOW
+            #     score += 100
+
+            ordered_moves.append(move)
+
+        yield from ordered_moves
 
     # @staticmethod
     # def worth_capturing(board: rc.Board, move: rc.Move) -> bool:
@@ -276,24 +254,24 @@ class ChessBot:
         Scores are incrementally updated based on the move.
         Returns the best value and move for the current player.
         """
-        key: int = board.zobrist_hash
-
-        # Evaluate game-ending conditions
+        # Evaluate game-ending conditions # TODO: Check if get_status is faster
         board.reset_move_generator()  # 1.00s
-        best_move = next(board.generate_legal_moves(), None)  # 0.52s
+        best_move = board.generate_next_legal_move()
         if not best_move:  # No legal moves
             if board.is_check():  # Checkmate
                 return np.int16(MIN_VALUE + (DEPTH - depth)), None  # Subtract depth to encourage faster mate
             return np.int16(0), None  # Stalemate
         # Avoid insufficient material, fifty move rule, threfold repetition
-        if board.is_insufficient_material() or board.is_fifty_moves() or self.is_repetition(board, key, depth): # 0.96s
+        if board.is_insufficient_material() or board.is_fifty_moves() or board.is_fivefold_repetition():  # 0.96s
             return np.int16(0), None
 
         # Terminal node check
         if depth == 0:
-            value = color_multiplier * score.calculate() # 3.17s
+            value = color_multiplier * score.calculate()  # 3.17s
             return value, None  # No move to return
             # return self.quiescence(board, 3, alpha, beta, score), None # No move to return
+
+        key: int = board.zobrist_hash
 
         # Lookup position in transposition table
         tt_entry: TTEntry | None = self.transposition_table.get(key)
@@ -318,12 +296,12 @@ class ChessBot:
         self.history.appendleft(key)  # Add position to history
 
         best_value: np.int16 = MIN_VALUE
-        for move in self.ordered_moves_generator(board, tt_move): # 7.49s
+        for move in self.ordered_moves_generator(board, tt_move, best_move):  # 7.49s
             _increment_moves_and_render_arrow(depth, move)  # TODO: Move increment outside to start of alpha-beta
 
-            updated_score: Score = _score_updated(board, move) # 16.48s
+            updated_score: Score = _score_updated(board, move)  # 16.48s
             # _push(move)
-            temp_board = board.make_move_new(move, check_legality=False) # 2.2s
+            temp_board = board.make_move_new(move, check_legality=False)  # 2.2s
             value = -_mt_negamax(temp_board, depth - 1, -gamma + 1, -color_multiplier, updated_score)[0]
             # _pop()
 
