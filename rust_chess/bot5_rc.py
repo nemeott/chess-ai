@@ -104,8 +104,7 @@ class ChessBot:
             yield tt_move
 
         # Cache functions for faster lookups
-        _is_capture = board.is_capture
-        _piece_type_at = board.get_piece_type_on
+        _get_piece_type_on = board.get_piece_type_on
         _turn = board.turn
 
         # Cache table for faster lookups
@@ -115,15 +114,15 @@ class ChessBot:
         ordered_moves = []
 
         # Capturing a piece bonus (MVV/LVA - Most Valuable Victim/Least Valuable Attacker)
-        for move in board.generate_legal_captures():  # 0.98s
+        for move in board.generate_legal_captures():  # 0.14s
             score = 0
 
-            victim_piece_type = _piece_type_at(move.dest)  # ty:ignore[possibly-missing-attribute]
-            attacker_piece_type = _piece_type_at(move.source)  # ty:ignore[possibly-missing-attribute]
+            victim_piece_type = _get_piece_type_on(move.dest)  # ty:ignore[possibly-missing-attribute] # 0.18s
+            attacker_piece_type = _get_piece_type_on(move.source)  # ty:ignore[possibly-missing-attribute] # 0.13s
 
             # Handle en passant captures
             if not victim_piece_type:  # Implied en passant capture since no piece at to_square and pawn moving
-                victim_piece_type = _piece_type_at(move.dest.backward(_turn))  # ty:ignore[invalid-argument-type, possibly-missing-attribute]
+                victim_piece_type = _get_piece_type_on(move.dest.backward(_turn))  # ty:ignore[invalid-argument-type, possibly-missing-attribute]
                 score += 5  # Small bonus for en passant captures
 
             # TODO: Sort good vs bad captures
@@ -131,11 +130,11 @@ class ChessBot:
             score += 10_000 + int(
                 _piece_values[victim_piece_type]  # ty:ignore[invalid-argument-type]
                 - _piece_values[attacker_piece_type]  # ty:ignore[invalid-argument-type]  # noqa: COM812
-            )
+            )  # 0.28s
 
             ordered_moves.append((move, score))
 
-        ordered_moves.sort(key=lambda x: x[1], reverse=True)
+        ordered_moves.sort(key=lambda x: x[1], reverse=True)  # 0.34s
         for move_and_score in ordered_moves:
             yield move_and_score[0]
 
@@ -144,12 +143,12 @@ class ChessBot:
         if extra_move:
             yield extra_move
 
-        for move in board.generate_legal_moves():  # 0.98s
+        for move in board.generate_legal_moves():  # 0.24s
             # TODO: Killer moves
             # if move in self.killer_moves:
             #     score += 1_000
 
-            if move.promotion:  # Promotion bonus
+            if move.promotion:  # Promotion bonus # 0.16s
                 yield move
 
             # if score == 0 and board.gives_check(move): # ! SLOW
@@ -255,26 +254,25 @@ class ChessBot:
         Returns the best value and move for the current player.
         """
         # Evaluate game-ending conditions # TODO: Check if get_status is faster
-        board.reset_move_generator()  # 1.00s
-        best_move = board.generate_next_legal_move()
+        board.reset_move_generator()  # 0.70s
+        best_move = board.generate_next_legal_move()  # 0.26s
         if not best_move:  # No legal moves
             if board.is_check():  # Checkmate
                 return np.int16(MIN_VALUE + (DEPTH - depth)), None  # Subtract depth to encourage faster mate
             return np.int16(0), None  # Stalemate
-        # Avoid insufficient material, fifty move rule, threfold repetition
-        if board.is_insufficient_material() or board.is_fifty_moves() or board.is_fivefold_repetition():  # 0.96s
+        # Avoid fifty move rule, insufficient material, and threefold repetition
+        if board.is_fifty_moves() or board.is_insufficient_material() or board.is_threefold_repetition():  # 0.30s
             return np.int16(0), None
 
         # Terminal node check
         if depth == 0:
-            value = color_multiplier * score.calculate()  # 3.17s
+            value = color_multiplier * score.calculate()  # 2.79s
             return value, None  # No move to return
             # return self.quiescence(board, 3, alpha, beta, score), None # No move to return
 
-        key: int = board.zobrist_hash
-
         # Lookup position in transposition table
-        tt_entry: TTEntry | None = self.transposition_table.get(key)
+        key: int = board.zobrist_hash
+        tt_entry: TTEntry | None = self.transposition_table.get(key)  # 0.56s
 
         # If position is in transposition table and depth is sufficient
         tt_move = None
@@ -296,12 +294,12 @@ class ChessBot:
         self.history.appendleft(key)  # Add position to history
 
         best_value: np.int16 = MIN_VALUE
-        for move in self.ordered_moves_generator(board, tt_move, best_move):  # 7.49s
+        for move in self.ordered_moves_generator(board, tt_move, best_move):  # 2.05s
             _increment_moves_and_render_arrow(depth, move)  # TODO: Move increment outside to start of alpha-beta
 
-            updated_score: Score = _score_updated(board, move)  # 16.48s
+            updated_score: Score = _score_updated(board, move)  # 14.66s
             # _push(move)
-            temp_board = board.make_move_new(move, check_legality=False)  # 2.2s
+            temp_board = board.make_move_new(move, check_legality=False)  # 2.11s
             value = -_mt_negamax(temp_board, depth - 1, -gamma + 1, -color_multiplier, updated_score)[0]
             # _pop()
 
