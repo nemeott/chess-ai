@@ -126,11 +126,6 @@ class Score: # Positive values favor white, negative values favor black
         """
         material, mg, eg, npm, pawn_struct, king_safety = 0, 0, 0, 0, 0, 0
 
-        # Cache tables for faster lookups
-        _piece_values = PIECE_VALUES_STOCKFISH
-        _mg_tables = PSQT[MIDGAME]
-        _eg_tables = PSQT[ENDGAME]
-
         # Bishop counts for pair bonus
         white_bishop_count = 0
         black_bishop_count = 0
@@ -143,21 +138,21 @@ class Score: # Positive values favor white, negative values favor black
 
                 # Update npm score
                 if piece_type != rc.PAWN and piece_type != rc.KING:
-                    npm += _piece_values[piece_type]
+                    npm += PIECE_VALUES_STOCKFISH[piece_type]
 
                 # Update material and position scores
                 if piece_color: # White piece
                     if piece_type != rc.KING:
-                        material += int(_piece_values[piece_type])
-                    mg += _mg_tables[piece_type][square.flip()] # type: ignore
-                    eg += _eg_tables[piece_type][square.flip()] # type: ignore
+                        material += int(PIECE_VALUES_STOCKFISH[piece_type])
+                    mg += PSQT[MIDGAME][piece_type][square.flip()] # type: ignore
+                    eg += PSQT[ENDGAME][piece_type][square.flip()] # type: ignore
                     if piece_type == rc.BISHOP:
                         white_bishop_count += 1
                 else: # Black piece
                     if piece_type != rc.KING:
-                        material -= int(_piece_values[piece_type])
-                    mg -= _mg_tables[piece_type][square] # type: ignore
-                    eg -= _eg_tables[piece_type][square] # type: ignore
+                        material -= int(PIECE_VALUES_STOCKFISH[piece_type])
+                    mg -= PSQT[MIDGAME][piece_type][square] # type: ignore
+                    eg -= PSQT[ENDGAME][piece_type][square] # type: ignore
                     if piece_type == rc.BISHOP:
                         black_bishop_count += 1
 
@@ -202,6 +197,7 @@ class Score: # Positive values favor white, negative values favor black
         self.material, self.mg, self.eg, self.npm, self.pawn_struct, self.king_safety = \
             np.int16(material), np.int16(mg), np.int16(eg), np.uint16(npm), np.int8(pawn_struct), np.int8(king_safety)
 
+    
     def updated(self, board: rc.Board, move: rc.Move) -> "Score":
         """
         Returns the updated material, midgame, endgame, non-pawn material, pawn structure, and king safety scores based on the move.
@@ -210,15 +206,6 @@ class Score: # Positive values favor white, negative values favor black
         Incremental updates are much faster than re-evaluating the entire board since we would have to push and pop and iterate over the entire board.
         """
         material, mg, eg, npm, pawn_struct, king_safety = self.material, self.mg, self.eg, self.npm, self.pawn_struct, self.king_safety
-
-        # Cache tables for faster lookups
-        _piece_values: list[np.int16] = PIECE_VALUES_STOCKFISH
-        _mg_tables: list[NDArray[np.int16]] = PSQT[MIDGAME]
-        _eg_tables: list[NDArray[np.int16]] = PSQT[ENDGAME]
-
-        # Cache constants for faster lookups
-        _isolated_pawn_penalty = ISOLATED_PAWN_PENALTY
-        _doubled_pawn_penalty = DOUBLED_PAWN_PENALTY
 
         # Get move information
         from_square = move.source
@@ -241,7 +228,7 @@ class Score: # Positive values favor white, negative values favor black
                 pawns_in_file_after = (pawns_after & file_masks[file]).popcnt()
 
                 if pawns_in_file_after == 1: # 2 pawns in file before
-                    pawn_struct += color_multiplier * _doubled_pawn_penalty # Remove doubled pawn penalty
+                    pawn_struct += color_multiplier * DOUBLED_PAWN_PENALTY # Remove doubled pawn penalty
 
                 if pawns_in_file_after == 0: # No pawns in file after move
                     left_pawns = (pawns_after & file_masks[file - 1]).popcnt() if file > 0 else 0
@@ -249,13 +236,13 @@ class Score: # Positive values favor white, negative values favor black
 
                     # If no longer isolated because of promotion
                     if left_pawns == 0 and right_pawns == 0:
-                        pawn_struct += color_multiplier * _isolated_pawn_penalty # Remove penalty
+                        pawn_struct += color_multiplier * ISOLATED_PAWN_PENALTY # Remove penalty
                     # Check if left file is now isolated
                     if left_pawns >= 1 and ((pawns_after & file_masks[file - 2]).popcnt() if file > 1 else 0) == 0:
-                        pawn_struct -= color_multiplier * _isolated_pawn_penalty # Add penalty for isolated left file
+                        pawn_struct -= color_multiplier * ISOLATED_PAWN_PENALTY # Add penalty for isolated left file
                     # Check if right file is now isolated
                     if right_pawns >= 1 and ((pawns_after & file_masks[file + 2]).popcnt() if file < 6 else 0) == 0:
-                        pawn_struct -= color_multiplier * _isolated_pawn_penalty # Add penalty for isolated right file
+                        pawn_struct -= color_multiplier * ISOLATED_PAWN_PENALTY # Add penalty for isolated right file
 
             else: # Not promoting
                 pawns_after |= rc.Bitboard.from_square(to_square) # Add moved pawn to pawns
@@ -267,7 +254,7 @@ class Score: # Positive values favor white, negative values favor black
                 pawns_in_file_after = (pawns_after & file_masks[file]).popcnt()
 
                 if file != to_file and pawns_in_file_after == 1: # 2 pawns in file before
-                    pawn_struct += color_multiplier * _doubled_pawn_penalty # Remove doubled pawn penalty
+                    pawn_struct += color_multiplier * DOUBLED_PAWN_PENALTY # Remove doubled pawn penalty
 
                 if to_file < file: # Move to left file (left, to_file, file, right)
                     left_pawns = (pawns_after & file_masks[to_file - 1]).popcnt() if to_file > 0 else 0
@@ -276,22 +263,22 @@ class Score: # Positive values favor white, negative values favor black
                     right_pawns = (pawns_after & file_masks[file + 1]).popcnt() if file < 7 else 0
 
                     if file != to_file and pawns_in_to_file == 2: # If now 2 pawns in file
-                        pawn_struct -= color_multiplier * _doubled_pawn_penalty # Add doubled pawn penalty
+                        pawn_struct -= color_multiplier * DOUBLED_PAWN_PENALTY # Add doubled pawn penalty
 
                     # If no longer isolated because of move (moved left, had no right pawns)
                     if pawns_in_to_file == 1 and right_pawns == 0:
-                        pawn_struct += color_multiplier * _isolated_pawn_penalty # Remove penalty
+                        pawn_struct += color_multiplier * ISOLATED_PAWN_PENALTY # Remove penalty
 
                     # Self isolating
                     if pawns_in_to_file >= 1 and left_pawns == 0 and pawns_in_file_after == 0:
-                        pawn_struct -= color_multiplier * _isolated_pawn_penalty # Add penalty
+                        pawn_struct -= color_multiplier * ISOLATED_PAWN_PENALTY # Add penalty
 
                     # Left was isolated previously (have left pawns, added a pawn, and no pawns left of left adj)
                     if left_pawns >= 1 and pawns_in_to_file == 1 and ((pawns_after & file_masks[to_file - 2]).popcnt() if to_file > 1 else 0) == 0:
-                        pawn_struct += color_multiplier * _isolated_pawn_penalty # Remove penalty
+                        pawn_struct += color_multiplier * ISOLATED_PAWN_PENALTY # Remove penalty
                     # Right adj is now isolated
                     if pawns_in_file_after == 0 and right_pawns >= 1 and ((pawns_after & file_masks[file + 2]).popcnt() if file < 6 else 0) == 0:
-                        pawn_struct -= color_multiplier * _isolated_pawn_penalty # Add penalty
+                        pawn_struct -= color_multiplier * ISOLATED_PAWN_PENALTY # Add penalty
 
                 elif to_file > file: # Move to right file (left, file, to_file, right)
                     left_pawns = (pawns_after & file_masks[file - 1]).popcnt() if file > 0 else 0
@@ -300,30 +287,30 @@ class Score: # Positive values favor white, negative values favor black
                     right_pawns = (pawns_after & file_masks[to_file + 1]).popcnt() if to_file < 7 else 0
 
                     if file != to_file and pawns_in_to_file == 2: # If now 2 pawns in file
-                        pawn_struct -= color_multiplier * _doubled_pawn_penalty # Add doubled pawn penalty
+                        pawn_struct -= color_multiplier * DOUBLED_PAWN_PENALTY # Add doubled pawn penalty
 
                     # If no longer isolated because of move (moved right, had no left pawns)
                     if pawns_in_to_file == 1 and left_pawns == 0:
-                        pawn_struct += color_multiplier * _isolated_pawn_penalty # Remove penalty
+                        pawn_struct += color_multiplier * ISOLATED_PAWN_PENALTY # Remove penalty
 
                     # Self isolating
                     if pawns_in_to_file >= 1 and right_pawns == 0 and pawns_in_file_after == 0:
-                        pawn_struct -= color_multiplier * _isolated_pawn_penalty # Add penalty
+                        pawn_struct -= color_multiplier * ISOLATED_PAWN_PENALTY # Add penalty
 
                     # Left adj is now isolated
                     if pawns_in_file_after == 0 and left_pawns >= 1 and ((pawns_after & file_masks[file - 2]).popcnt() if file > 1 else 0) == 0:
-                        pawn_struct -= color_multiplier * _isolated_pawn_penalty # Add penalty
+                        pawn_struct -= color_multiplier * ISOLATED_PAWN_PENALTY # Add penalty
                     # Right was isolated previously (added a pawn, have right pawns, and no pawns right of right adj)
                     if right_pawns >= 1 and pawns_in_to_file == 1 and ((pawns_after & file_masks[to_file + 2]).popcnt() if to_file < 6 else 0) == 0:
-                        pawn_struct += color_multiplier * _isolated_pawn_penalty # Remove penalty
+                        pawn_struct += color_multiplier * ISOLATED_PAWN_PENALTY # Remove penalty
 
         # --- Castling ---
         elif piece_type == rc.KING: # Update rook scores if castling
             castle_info = CASTLING_UPDATES.get((from_square, to_square, piece_color))
             if castle_info:
                 castling = True
-                mg_rook_table = _mg_tables[rc.ROOK]
-                eg_rook_table = _eg_tables[rc.ROOK]
+                mg_rook_table = PSQT[MIDGAME][rc.ROOK]
+                eg_rook_table = PSQT[ENDGAME][rc.ROOK]
 
                 rook_from, rook_to = castle_info
                 if piece_color: # Flip rook square for white
@@ -345,15 +332,15 @@ class Score: # Positive values favor white, negative values favor black
                 if bishop_count_before == 1: # If 2 bishops now, add bonus
                     material += color_multiplier * BISHOP_PAIR_BONUS
 
-            npm += _piece_values[promotion_piece_type]
-            material += color_multiplier * (_piece_values[promotion_piece_type] - _piece_values[rc.PAWN])
-            mg += color_multiplier * (_mg_tables[promotion_piece_type][new_to_square] - # type: ignore
-                                      _mg_tables[rc.PAWN][new_from_square]) # type: ignore
-            eg += color_multiplier * (_eg_tables[promotion_piece_type][new_to_square] - # type: ignore
-                                      _eg_tables[rc.PAWN][new_from_square]) # type: ignore
+            npm += PIECE_VALUES_STOCKFISH[promotion_piece_type]
+            material += color_multiplier * (PIECE_VALUES_STOCKFISH[promotion_piece_type] - PIECE_VALUES_STOCKFISH[rc.PAWN])
+            mg += color_multiplier * (PSQT[MIDGAME][promotion_piece_type][new_to_square] - # type: ignore
+                                      PSQT[MIDGAME][rc.PAWN][new_from_square]) # type: ignore
+            eg += color_multiplier * (PSQT[ENDGAME][promotion_piece_type][new_to_square] - # type: ignore
+                                      PSQT[ENDGAME][rc.PAWN][new_from_square]) # type: ignore
         else: # Normal move
-            mg_table = _mg_tables[piece_type] # type: ignore
-            eg_table = _eg_tables[piece_type] # type: ignore
+            mg_table = PSQT[MIDGAME][piece_type] # type: ignore
+            eg_table = PSQT[ENDGAME][piece_type] # type: ignore
             mg += color_multiplier * (mg_table[new_to_square] - mg_table[new_from_square]) # ? Expensive  # ty:ignore[not-subscriptable]
             eg += color_multiplier * (eg_table[new_to_square] - eg_table[new_from_square]) # ? Expensive (less)  # ty:ignore[not-subscriptable]
 
@@ -384,20 +371,20 @@ class Score: # Positive values favor white, negative values favor black
 
                     # Update isolated pawn penalties
                     if left_pawns == 0 and right_pawns == 0: # Pawn isolated previously
-                        pawn_struct += -color_multiplier * _isolated_pawn_penalty # Remove penalty
+                        pawn_struct += -color_multiplier * ISOLATED_PAWN_PENALTY # Remove penalty
                     # Left adj isolated
                     if left_pawns >= 1 and ((enemy_pawns_after & file_masks[file - 2]).popcnt() if file > 1 else 0) == 0:
-                        pawn_struct -= -color_multiplier * _isolated_pawn_penalty # Add penalty
+                        pawn_struct -= -color_multiplier * ISOLATED_PAWN_PENALTY # Add penalty
                     # Right adj isolated
                     if right_pawns >= 1 and ((enemy_pawns_after & file_masks[file + 2]).popcnt() if file < 6 else 0) == 0:
-                        pawn_struct -= -color_multiplier * _isolated_pawn_penalty # Add penalty
+                        pawn_struct -= -color_multiplier * ISOLATED_PAWN_PENALTY # Add penalty
                 elif pawns_in_file_after == 1: # 2 pawns in file before
-                    pawn_struct += -color_multiplier * _doubled_pawn_penalty # Remove doubled pawn penalty
+                    pawn_struct += -color_multiplier * DOUBLED_PAWN_PENALTY # Remove doubled pawn penalty
 
             # --- Score Updates From Capture ---
             else: # Capturing a piece other than a pawn
                 # Update npm score
-                npm -= _piece_values[captured_piece_type]
+                npm -= PIECE_VALUES_STOCKFISH[captured_piece_type]
 
                 # Update bishop pair bonus if bishop captured
                 if captured_piece_type == rc.BISHOP and board.get_piece_bitboard(rc.Piece(captured_piece_type, not piece_color)).popcnt() == 2:
@@ -407,9 +394,9 @@ class Score: # Positive values favor white, negative values favor black
                 to_square = to_square.flip()
 
             # Remove captured piece from material and position scores
-            material -= -color_multiplier * _piece_values[captured_piece_type]
-            mg -= -color_multiplier * _mg_tables[captured_piece_type][to_square] # type: ignore
-            eg -= -color_multiplier * _eg_tables[captured_piece_type][to_square] # type: ignore
+            material -= -color_multiplier * PIECE_VALUES_STOCKFISH[captured_piece_type]
+            mg -= -color_multiplier * PSQT[MIDGAME][captured_piece_type][to_square] # type: ignore
+            eg -= -color_multiplier * PSQT[ENDGAME][captured_piece_type][to_square] # type: ignore
 
         return Score(material, mg, eg, npm, pawn_struct, king_safety) # ? Expensive
 

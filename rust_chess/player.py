@@ -1,4 +1,5 @@
 import chess
+import rust_chess as rc
 import pygame
 
 
@@ -25,12 +26,12 @@ class Player:  # TODO: Heavily refactor
             rank_idx = 7 - rank_idx
         return chess.square(file_idx, rank_idx)
 
-    def is_promotion_move(self, board: chess.Board, from_square, to_square):
+    def is_promotion_move(self, board: rc.Board, from_square, to_square):
         """Check if the move would be a pawn promotion."""
-        piece = board.piece_at(from_square)
-        if piece and piece.piece_type == chess.PAWN:
-            rank = chess.square_rank(to_square)
-            return (self.color == chess.WHITE and rank == 7) or (self.color == chess.BLACK and rank == 0)
+        piece = board.get_piece_on(rc.Square(from_square))
+        if piece and piece.piece_type == rc.PAWN:
+            rank = rc.Square(to_square).get_rank()
+            return (self.color == rc.WHITE and rank == 7) or (self.color == rc.BLACK and rank == 0)
         return False
 
     def get_promotion_choice(self):
@@ -123,7 +124,7 @@ class Player:  # TODO: Heavily refactor
                     if button_rect.collidepoint(mouse_pos):
                         return piece_type
 
-    def get_move(self, board: chess.Board):
+    def get_move(self, board: rc.Board):
         """Get move from human player through GUI interaction."""
         # Removed pygame.event.clear() to avoid discarding important events
 
@@ -139,7 +140,7 @@ class Player:  # TODO: Heavily refactor
 
                 if self.selected_square is None:
                     # First click - select piece
-                    piece = board.piece_at(square)
+                    piece = board.get_piece_on(rc.Square(square))
                     if piece and piece.color == self.color:
                         self.selected_square = square
                         # Immediately redraw board with highlighted square
@@ -162,7 +163,7 @@ class Player:  # TODO: Heavily refactor
                         move = chess.Move(from_square, to_square)
 
                     # Check if move is legal
-                    if move in board.legal_moves:
+                    if move in board.generate_legal_moves():
                         self.selected_square = None
                         # Change castling move's to_square to the empty square, not the rook's square
                         if board.is_castling(move):
